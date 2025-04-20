@@ -36,8 +36,7 @@ Yes, you can set both the slide delay (time between slides) and page refresh int
 
 ## Screenshots
 
-1. Digital signage display showing rotating images
-2. Admin settings page
+![Digital signage display](/wp-content/plugins/digital-signage/assets/screenshot-1.png)
 
 ## Changelog
 
