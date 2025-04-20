@@ -1,0 +1,8 @@
+wp-content/themes/*
+wp-content/fonts/*
+wp-content/plugins/akismet/*
+wp-content/plugins/hello.php
+wp-content/plugins/spice-starter-sites/*
+wp-content/uploads/*
+**/vendor/**/*
+.DS_Store

@@ -1,0 +1,237 @@
+<?php
+/*
+Plugin Name: Digital Signage
+Description: Adds a page that displays a digital signage gallery of images from your WordPress posts.
+Version: 1.0.0
+Author: stankovski
+Author URI: https://github.com/stankovski/
+Text Domain: digital-signage
+Domain Path: /languages
+License: MIT
+License URI: https://opensource.org/licenses/MIT
+*/
+
+if (!defined('ABSPATH')) exit;
+
+// Register custom image size (do not hook to after_setup_theme)
+function dsp_register_image_sizes() {
+    $width = intval(get_option('dsp_image_width', 1260));
+    $height = intval(get_option('dsp_image_height', 940));
+    add_image_size('dsp-gallery-thumb', $width, $height, false);
+}
+dsp_register_image_sizes(); // Call directly, not via hook
+
+// Register custom rewrite endpoint
+function dsp_add_gallery_rewrite() {
+    add_rewrite_rule('^digital-signage/?$', 'index.php?dsp_gallery=1', 'top');
+}
+add_action('init', 'dsp_add_gallery_rewrite');
+
+// Flush rewrite rules on plugin activation
+function dsp_activate_plugin() {
+    dsp_add_gallery_rewrite();
+    flush_rewrite_rules();
+}
+register_activation_hook(__FILE__, 'dsp_activate_plugin');
+
+// Optional: Flush rewrite rules on plugin deactivation
+function dsp_deactivate_plugin() {
+    flush_rewrite_rules();
+}
+register_deactivation_hook(__FILE__, 'dsp_deactivate_plugin');
+
+// Register query var
+function dsp_add_query_vars($vars) {
+    $vars[] = 'dsp_gallery';
+    return $vars;
+}
+add_filter('query_vars', 'dsp_add_query_vars');
+
+// Template redirect for gallery page
+function dsp_template_redirect() {
+    if (get_query_var('dsp_gallery')) {
+        dsp_render_gallery_page();
+        exit;
+    }
+}
+add_action('template_redirect', 'dsp_template_redirect');
+
+// --- Settings Page ---
+require_once plugin_dir_path(__FILE__) . 'settings.php';
+
+// REST API endpoint for gallery images
+add_action('rest_api_init', function () {
+    register_rest_route('dsp/v1', '/images', [
+        'methods' => 'GET',
+        'callback' => function () {
+            $category_name = get_option('dsp_category_name', 'news');
+            $width = intval(get_option('dsp_image_width', 1260));
+            $height = intval(get_option('dsp_image_height', 940));
+            $image_size = 'dsp-gallery-thumb';
+            $args = [
+                'category_name' => $category_name,
+                'posts_per_page' => -1,
+                'post_status' => 'publish',
+            ];
+            $query = new WP_Query($args);
+            $images = [];
+            if ($query->have_posts()) {
+                while ($query->have_posts()) {
+                    $query->the_post();
+                    $post_id = get_the_ID();
+                    $thumb_id = get_post_thumbnail_id($post_id);
+                    if ($thumb_id) {
+                        // Check if the custom size exists, generate if not
+                        $meta = wp_get_attachment_metadata($thumb_id);
+                        if (!isset($meta['sizes'][$image_size])) {
+                            // Generate the image size on demand
+                            require_once ABSPATH . 'wp-admin/includes/image.php';
+                            $fullsizepath = get_attached_file($thumb_id);
+                            if ($fullsizepath && file_exists($fullsizepath)) {
+                                $metadata = wp_generate_attachment_metadata($thumb_id, $fullsizepath);
+                                if ($metadata && !is_wp_error($metadata)) {
+                                    wp_update_attachment_metadata($thumb_id, $metadata);
+                                }
+                            }
+                        }
+                        $img_url = get_the_post_thumbnail_url($post_id, $image_size);
+                        if ($img_url) {
+                            $images[] = $img_url;
+                        }
+                    }
+                }
+                wp_reset_postdata();
+            }
+            return rest_ensure_response($images);
+        },
+        'permission_callback' => '__return_true'
+    ]);
+});
+
+// Render gallery HTML
+function dsp_render_gallery_page() {
+    $width = intval(get_option('dsp_image_width', 1260));
+    $height = intval(get_option('dsp_image_height', 940));
+    $category_name = esc_html(get_option('dsp_category_name', 'news'));
+    $refresh_interval = intval(get_option('dsp_refresh_interval', 10));
+    $slide_delay = intval(get_option('dsp_slide_delay', 5));
+    ?>
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Digital Signage</title>
+        <style>
+            html, body {
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+            body { 
+                font-family: Arial, sans-serif; 
+                margin: 0;
+                padding: 0;
+            }
+            .main-content {
+                margin: 0;
+                padding: 0;
+            }
+            .gallery {
+                display: flex;
+                gap: 20px;
+                justify-content: center;
+                align-items: flex-start;
+                min-height: <?php echo $height; ?>px;
+                margin: 0;
+                padding: 0;
+            }
+            .gallery img {
+                width: <?php echo $width; ?>px;
+                height: <?php echo $height; ?>px;
+                object-fit: contain;
+                max-width: 100%;
+                max-height: 100vh;
+                border-radius: 0px;
+                display: none;
+                margin: 0;
+                padding: 0;
+            }
+            .gallery img.active {
+                display: block;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="main-content">
+            <div class="gallery" id="dsp-carousel">
+                <p id="dsp-loading">Loading images...</p>
+            </div>
+        </div>
+        <script>
+        // Async load images and run carousel
+        (function() {
+            var carousel = document.getElementById('dsp-carousel');
+            var loading = document.getElementById('dsp-loading');
+            var imgEls = [];
+            var idx = 0;
+            var carouselInterval = null;
+            var refreshInterval = <?php echo max(1, $refresh_interval) * 1000; ?>;
+            var slideDelay = <?php echo max(1, $slide_delay) * 1000; ?>;
+
+            function startCarousel() {
+                if (carouselInterval) clearInterval(carouselInterval);
+                if (imgEls.length < 2) return;
+                carouselInterval = setInterval(function() {
+                    imgEls[idx].classList.remove('active');
+                    idx = (idx + 1) % imgEls.length;
+                    imgEls[idx].classList.add('active');
+                }, slideDelay);
+            }
+
+            function renderImages(images) {
+                // Remove old images
+                imgEls.forEach(function(img) { img.remove(); });
+                imgEls = [];
+                if (!images || !images.length) {
+                    if (!loading) {
+                        loading = document.createElement('p');
+                        loading.id = 'dsp-loading';
+                        carousel.appendChild(loading);
+                    }
+                    loading.textContent = 'No images found for category "<?php echo $category_name; ?>".';
+                    return;
+                }
+                if (loading) loading.remove();
+                images.forEach(function(url, i) {
+                    var img = document.createElement('img');
+                    img.src = url;
+                    img.alt = 'Gallery Image';
+                    carousel.appendChild(img);
+                    imgEls.push(img);
+                });
+                // Reset index if out of bounds
+                if (idx >= imgEls.length) idx = 0;
+                imgEls.forEach(function(img, i) {
+                    img.className = (i === idx) ? 'active' : '';
+                });
+                startCarousel();
+            }
+
+            function fetchImages() {
+                fetch('<?php echo esc_url( rest_url('dsp/v1/images') ); ?>')
+                    .then(function(res) { return res.json(); })
+                    .then(function(images) {
+                        renderImages(images);
+                    })
+                    .catch(function() {
+                        if (loading) loading.textContent = 'Failed to load images.';
+                    });
+            }
+
+            fetchImages();
+            setInterval(fetchImages, refreshInterval);
+        })();
+        </script>
+    </body>
+    </html>
+    <?php
+}
