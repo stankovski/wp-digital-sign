@@ -68,6 +68,8 @@ add_action('rest_api_init', function () {
             $width = intval(get_option('dsp_image_width', 1260));
             $height = intval(get_option('dsp_image_height', 940));
             $image_size = 'dsp-gallery-thumb';
+            $refresh_interval = intval(get_option('dsp_refresh_interval', 10));
+            $slide_delay = intval(get_option('dsp_slide_delay', 5));
             $args = [
                 'category_name' => $category_name,
                 'posts_per_page' => -1,
@@ -102,7 +104,13 @@ add_action('rest_api_init', function () {
                 }
                 wp_reset_postdata();
             }
-            return rest_ensure_response($images);
+            return rest_ensure_response([
+                'images' => $images,
+                'settings' => [
+                    'refresh_interval' => $refresh_interval,
+                    'slide_delay' => $slide_delay
+                ]
+            ]);
         },
         'permission_callback' => '__return_true'
     ]);
@@ -174,6 +182,7 @@ function dsp_render_gallery_page() {
             var imgEls = [];
             var idx = 0;
             var carouselInterval = null;
+            // Initial default values until first API response
             var refreshInterval = <?php echo esc_js(max(1, $refresh_interval) * 1000); ?>;
             var slideDelay = <?php echo esc_js(max(1, $slide_delay) * 1000); ?>;
 
@@ -187,7 +196,20 @@ function dsp_render_gallery_page() {
                 }, slideDelay);
             }
 
-            function renderImages(images) {
+            function renderImages(data) {
+                // Update intervals if provided in response
+                if (data.settings) {
+                    if (data.settings.refresh_interval) {
+                        refreshInterval = Math.max(1, data.settings.refresh_interval) * 1000;
+                    }
+                    if (data.settings.slide_delay) {
+                        slideDelay = Math.max(1, data.settings.slide_delay) * 1000;
+                    }
+                }
+                
+                // Get images from response
+                var images = data.images || [];
+                
                 // Remove old images
                 imgEls.forEach(function(img) { img.remove(); });
                 imgEls = [];
@@ -220,8 +242,8 @@ function dsp_render_gallery_page() {
             function fetchImages() {
                 fetch(<?php echo wp_json_encode(esc_url_raw(rest_url('dsp/v1/images'))); ?>)
                     .then(function(res) { return res.json(); })
-                    .then(function(images) {
-                        renderImages(images);
+                    .then(function(data) {
+                        renderImages(data);
                     })
                     .catch(function() {
                         if (loading) loading.textContent = <?php echo wp_json_encode(__('Failed to load images.', 'digital-signage')); ?>;
