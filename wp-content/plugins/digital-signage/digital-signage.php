@@ -157,7 +157,7 @@ function dsp_render_gallery_page() {
         <title>Digital Signage</title>
         <style>
             html, body {
-                height: <?php echo esc_attr($height); ?>px;
+                height: 100%;
                 margin: 0;
                 padding: 0;
                 overflow: hidden;
@@ -170,14 +170,14 @@ function dsp_render_gallery_page() {
             .main-content {
                 margin: 0;
                 padding: 0;
-                height: <?php echo esc_attr($height); ?>px;
+                height: 100%;
             }
             .gallery {
                 display: flex;
                 gap: 20px;
                 justify-content: center;
                 align-items: center;
-                height: <?php echo esc_attr($height); ?>px;
+                min-height: <?php echo esc_attr($height); ?>px;
                 margin: 0;
                 padding: 0;
             }
@@ -185,7 +185,7 @@ function dsp_render_gallery_page() {
                 width: <?php echo esc_attr($width); ?>px;
                 height: <?php echo esc_attr($height); ?>px;
                 max-width: 100%;
-                max-height: <?php echo esc_attr($height); ?>px;
+                max-height: 100%;
                 border-radius: 0px;
                 display: none;
                 margin: 0;
@@ -197,7 +197,7 @@ function dsp_render_gallery_page() {
                 width: 100%;
                 height: 100%;
                 object-fit: contain;
-                max-height: <?php echo esc_attr($height); ?>px;
+                max-height: 100%;
             }
             .gallery .slide.active {
                 display: flex;

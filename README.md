@@ -40,10 +40,8 @@ Yes, you can set both the slide delay (time between slides) and page refresh int
 
 ## Changelog
 
+### 1.0.1 
+* Added support for HTML pages; misc. improvements
+
 ### 1.0.0
 * Initial release
-
-## Upgrade Notice
-
-### 1.0.0
-Initial release of Digital Signage Page plugin.
