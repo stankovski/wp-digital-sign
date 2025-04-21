@@ -3,6 +3,7 @@ wp-content/fonts/*
 wp-content/plugins/akismet/*
 wp-content/plugins/hello.php
 wp-content/plugins/spice-starter-sites/*
+wp-content/plugins/plugin-check/*
 wp-content/uploads/*
 **/vendor/**/*
 .DS_Store

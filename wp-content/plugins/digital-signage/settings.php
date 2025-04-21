@@ -68,15 +68,15 @@ function dsp_render_settings_page() {
         
         <?php if ($has_plain_permalinks): ?>
         <div class="notice notice-error">
-            <p><strong>Warning:</strong> Your site is using "Plain" permalink settings. Digital Signage requires pretty permalinks to function correctly.</p>
-            <p>Please go to <a href="<?php echo admin_url('options-permalink.php'); ?>">Settings &gt; Permalinks</a> and choose a different permalink structure.</p>
+            <p><strong><?php esc_html_e('Warning:', 'digital-signage'); ?></strong> <?php esc_html_e('Your site is using "Plain" permalink settings. Digital Signage requires pretty permalinks to function correctly.', 'digital-signage'); ?></p>
+            <p><?php esc_html_e('Please go to', 'digital-signage'); ?> <a href="<?php echo esc_url(admin_url('options-permalink.php')); ?>"><?php esc_html_e('Settings &gt; Permalinks', 'digital-signage'); ?></a> <?php esc_html_e('and choose a different permalink structure.', 'digital-signage'); ?></p>
         </div>
         <?php endif; ?>
         
         <div style="background: #f8f9fa; border-left: 4px solid #0073aa; padding: 12px 16px; margin-bottom: 20px;">
             <strong>To view your digital signage gallery, navigate to:</strong>
             <br>
-            <a href="<?php echo $site_url; ?>"><?php echo $site_url; ?></a>
+            <a href="<?php echo esc_html($site_url); ?>"><?php echo esc_html($site_url); ?></a>
         </div>
         <form method="post" action="options.php">
             <?php settings_fields('dsp_settings_group'); ?>

@@ -25,3 +25,10 @@ msgstr ""
 #. Author of the plugin
 msgid "Example"
 msgstr ""
+
+#. translators: %s is the category name
+msgid "No images found for category \"%s\"."
+msgstr ""
+
+msgid "Failed to load images."
+msgstr ""

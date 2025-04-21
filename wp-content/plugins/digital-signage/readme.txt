@@ -1,8 +1,8 @@
-=== Digital Signage Page ===
+=== Digital Signage ===
 Contributors: example
 Tags: digital signage, slideshow, gallery
 Requires at least: 5.0
-Tested up to: 6.4
+Tested up to: 6.8
 Stable tag: 1.0.0
 Requires PHP: 7.0
 License: MIT
@@ -12,7 +12,7 @@ Create a dedicated digital signage display that automatically rotates through im
 
 == Description ==
 
-Digital Signage Page creates a specialized page for digital signage displays. It automatically rotates through featured images from posts in a specified category, making it perfect for information screens, waiting rooms, or promotional displays.
+Digital Signage creates a specialized page for digital signage displays. It automatically rotates through featured images from posts in a specified category, making it perfect for information screens, waiting rooms, or promotional displays.
 
 = Features =
 * Dedicated URL for your digital signage display
@@ -51,4 +51,4 @@ Yes, you can set both the slide delay (time between slides) and page refresh int
 == Upgrade Notice ==
 
 = 1.0.0 =
-Initial release of Digital Signage Page plugin.
+Initial release of Digital Signage plugin.

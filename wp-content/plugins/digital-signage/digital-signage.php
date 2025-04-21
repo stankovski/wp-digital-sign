@@ -140,13 +140,13 @@ function dsp_render_gallery_page() {
                 gap: 20px;
                 justify-content: center;
                 align-items: flex-start;
-                min-height: <?php echo $height; ?>px;
+                min-height: <?php echo esc_attr($height); ?>px;
                 margin: 0;
                 padding: 0;
             }
             .gallery img {
-                width: <?php echo $width; ?>px;
-                height: <?php echo $height; ?>px;
+                width: <?php echo esc_attr($width); ?>px;
+                height: <?php echo esc_attr($height); ?>px;
                 object-fit: contain;
                 max-width: 100%;
                 max-height: 100vh;
@@ -174,8 +174,8 @@ function dsp_render_gallery_page() {
             var imgEls = [];
             var idx = 0;
             var carouselInterval = null;
-            var refreshInterval = <?php echo max(1, $refresh_interval) * 1000; ?>;
-            var slideDelay = <?php echo max(1, $slide_delay) * 1000; ?>;
+            var refreshInterval = <?php echo esc_js(max(1, $refresh_interval) * 1000); ?>;
+            var slideDelay = <?php echo esc_js(max(1, $slide_delay) * 1000); ?>;
 
             function startCarousel() {
                 if (carouselInterval) clearInterval(carouselInterval);
@@ -197,7 +197,8 @@ function dsp_render_gallery_page() {
                         loading.id = 'dsp-loading';
                         carousel.appendChild(loading);
                     }
-                    loading.textContent = 'No images found for category "<?php echo $category_name; ?>".';
+                    /* translators: category name */
+                    loading.textContent = <?php echo wp_json_encode(sprintf(__('No images found for category "%s".', 'digital-signage'), $category_name)); ?>;
                     return;
                 }
                 if (loading) loading.remove();
@@ -217,13 +218,13 @@ function dsp_render_gallery_page() {
             }
 
             function fetchImages() {
-                fetch('<?php echo esc_url( rest_url('dsp/v1/images') ); ?>')
+                fetch(<?php echo wp_json_encode(esc_url_raw(rest_url('dsp/v1/images'))); ?>)
                     .then(function(res) { return res.json(); })
                     .then(function(images) {
                         renderImages(images);
                     })
                     .catch(function() {
-                        if (loading) loading.textContent = 'Failed to load images.';
+                        if (loading) loading.textContent = <?php echo wp_json_encode(__('Failed to load images.', 'digital-signage')); ?>;
                     });
             }
 
