@@ -140,6 +140,8 @@ add_action('rest_api_init', function () {
             $image_size = 'dsp-gallery-thumb';
             $refresh_interval = intval(get_option('dsp_refresh_interval', 10));
             $slide_delay = intval(get_option('dsp_slide_delay', 5));
+            $enable_qrcodes = (bool)get_option('dsp_enable_qrcodes', true);
+            
             $args = [
                 'category_name' => $category_name,
                 'posts_per_page' => -1,
@@ -153,8 +155,8 @@ add_action('rest_api_init', function () {
                     $post_id = get_the_ID();
                     $thumb_id = get_post_thumbnail_id($post_id);
                     
-                    // Generate QR code for this post
-                    $qr_code_url = dsp_generate_qrcode($post_id);
+                    // Generate QR code only if enabled
+                    $qr_code_url = $enable_qrcodes ? dsp_generate_qrcode($post_id) : '';
                     
                     if ($thumb_id) {
                         // Check if the custom size exists, generate if not
@@ -200,7 +202,8 @@ add_action('rest_api_init', function () {
                 'slides' => $slides,
                 'settings' => [
                     'refresh_interval' => $refresh_interval,
-                    'slide_delay' => $slide_delay
+                    'slide_delay' => $slide_delay,
+                    'enable_qrcodes' => $enable_qrcodes
                 ]
             ]);
         },
@@ -215,6 +218,7 @@ function dsp_render_gallery_page() {
     $category_name = esc_html(get_option('dsp_category_name', 'news'));
     $refresh_interval = intval(get_option('dsp_refresh_interval', 10));
     $slide_delay = intval(get_option('dsp_slide_delay', 5));
+    $enable_qrcodes = (bool)get_option('dsp_enable_qrcodes', true);
     ?>
     <!DOCTYPE html>
     <html>
@@ -291,6 +295,7 @@ function dsp_render_gallery_page() {
                 padding: 5px;
                 border-radius: 5px;
                 z-index: 10;
+                display: none; /* Hidden by default, controlled by JS */
             }
             .qrcode-overlay img {
                 width: 100%;
@@ -316,6 +321,7 @@ function dsp_render_gallery_page() {
             // Initial default values until first API response
             var refreshInterval = <?php echo esc_js(max(1, $refresh_interval) * 1000); ?>;
             var slideDelay = <?php echo esc_js(max(1, $slide_delay) * 1000); ?>;
+            var enableQrCodes = <?php echo $enable_qrcodes ? 'true' : 'false'; ?>;
 
             function startCarousel() {
                 if (carouselInterval) clearInterval(carouselInterval);
@@ -335,6 +341,9 @@ function dsp_render_gallery_page() {
                     }
                     if (data.settings.slide_delay) {
                         slideDelay = Math.max(1, data.settings.slide_delay) * 1000;
+                    }
+                    if (data.settings.hasOwnProperty('enable_qrcodes')) {
+                        enableQrCodes = data.settings.enable_qrcodes;
                     }
                 }
                 
@@ -379,7 +388,7 @@ function dsp_render_gallery_page() {
                         slideEl.appendChild(contentDiv);
                     }
                     
-                    // Add QR code overlay
+                    // Add QR code overlay only if URL is provided
                     if (slide.qrcode) {
                         var qrDiv = document.createElement('div');
                         qrDiv.classList.add('qrcode-overlay');
@@ -387,6 +396,8 @@ function dsp_render_gallery_page() {
                         qrImg.src = slide.qrcode;
                         qrImg.alt = 'Scan for more information';
                         qrDiv.appendChild(qrImg);
+                        // Set visibility based on current enableQrCodes setting
+                        qrDiv.style.display = enableQrCodes ? 'block' : 'none';
                         slideEl.appendChild(qrDiv);
                     }
                     

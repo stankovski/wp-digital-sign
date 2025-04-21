@@ -29,6 +29,11 @@ function dsp_register_settings() {
         'default' => 5,
         'sanitize_callback' => 'absint'
     ]);
+    register_setting('dsp_settings_group', 'dsp_enable_qrcodes', [
+        'type' => 'boolean',
+        'default' => true,
+        'sanitize_callback' => 'rest_sanitize_boolean'
+    ]);
 }
 
 // Add settings page
@@ -273,6 +278,16 @@ function dsp_render_settings_page() {
                     <td>
                         <input type="number" name="dsp_slide_delay" value="<?php echo esc_attr(get_option('dsp_slide_delay', 5)); ?>" min="1" />
                         <p class="description">Time in seconds each image is shown before switching to the next slide.</p>
+                    </td>
+                </tr>
+                <tr valign="top">
+                    <th scope="row">QR Codes</th>
+                    <td>
+                        <label>
+                            <input type="checkbox" name="dsp_enable_qrcodes" value="1" <?php checked(get_option('dsp_enable_qrcodes', true)); ?> />
+                            Enable QR codes for each slide
+                        </label>
+                        <p class="description">When enabled, a QR code linking to the post will be displayed on each slide.</p>
                     </td>
                 </tr>
             </table>
