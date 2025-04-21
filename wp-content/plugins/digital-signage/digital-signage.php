@@ -89,12 +89,13 @@ add_action('rest_api_init', function () {
                 'post_status' => 'publish',
             ];
             $query = new WP_Query($args);
-            $images = [];
+            $slides = [];
             if ($query->have_posts()) {
                 while ($query->have_posts()) {
                     $query->the_post();
                     $post_id = get_the_ID();
                     $thumb_id = get_post_thumbnail_id($post_id);
+                    
                     if ($thumb_id) {
                         // Check if the custom size exists, generate if not
                         $meta = wp_get_attachment_metadata($thumb_id);
@@ -111,14 +112,27 @@ add_action('rest_api_init', function () {
                         }
                         $img_url = get_the_post_thumbnail_url($post_id, $image_size);
                         if ($img_url) {
-                            $images[] = $img_url;
+                            $slides[] = [
+                                'type' => 'image',
+                                'content' => $img_url
+                            ];
+                        }
+                    } else {
+                        // No featured image, use post content instead
+                        $content = apply_filters('the_content', get_the_content());
+                        if (!empty($content)) {
+                            $slides[] = [
+                                'type' => 'html',
+                                'content' => $content,
+                                'title' => get_the_title()
+                            ];
                         }
                     }
                 }
                 wp_reset_postdata();
             }
             return rest_ensure_response([
-                'images' => $images,
+                'slides' => $slides,
                 'settings' => [
                     'refresh_interval' => $refresh_interval,
                     'slide_delay' => $slide_delay
@@ -143,9 +157,10 @@ function dsp_render_gallery_page() {
         <title>Digital Signage</title>
         <style>
             html, body {
-                height: 100%;
+                height: <?php echo esc_attr($height); ?>px;
                 margin: 0;
                 padding: 0;
+                overflow: hidden;
             }
             body { 
                 font-family: Arial, sans-serif; 
@@ -155,36 +170,57 @@ function dsp_render_gallery_page() {
             .main-content {
                 margin: 0;
                 padding: 0;
+                height: <?php echo esc_attr($height); ?>px;
             }
             .gallery {
                 display: flex;
                 gap: 20px;
                 justify-content: center;
-                align-items: flex-start;
-                min-height: <?php echo esc_attr($height); ?>px;
+                align-items: center;
+                height: <?php echo esc_attr($height); ?>px;
                 margin: 0;
                 padding: 0;
             }
-            .gallery img {
+            .gallery .slide {
                 width: <?php echo esc_attr($width); ?>px;
                 height: <?php echo esc_attr($height); ?>px;
-                object-fit: contain;
                 max-width: 100%;
-                max-height: 100vh;
+                max-height: <?php echo esc_attr($height); ?>px;
                 border-radius: 0px;
                 display: none;
                 margin: 0;
                 padding: 0;
+                box-sizing: border-box;
+                overflow: hidden;
             }
-            .gallery img.active {
-                display: block;
+            .gallery img {
+                width: 100%;
+                height: 100%;
+                object-fit: contain;
+                max-height: <?php echo esc_attr($height); ?>px;
+            }
+            .gallery .slide.active {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
+            .gallery .html-content {
+                overflow: auto;
+                background: #fff;
+                padding: 20px;
+                max-height: <?php echo esc_attr($height - 40); ?>px; /* Accounting for padding */
+                width: 100%;
+                box-sizing: border-box;
+            }
+            .gallery .html-content h2 {
+                margin-top: 0;
             }
         </style>
     </head>
     <body>
         <div class="main-content">
             <div class="gallery" id="dsp-carousel">
-                <p id="dsp-loading">Loading images...</p>
+                <p id="dsp-loading">Loading content...</p>
             </div>
         </div>
         <script>
@@ -192,7 +228,7 @@ function dsp_render_gallery_page() {
         (function() {
             var carousel = document.getElementById('dsp-carousel');
             var loading = document.getElementById('dsp-loading');
-            var imgEls = [];
+            var slideEls = [];
             var idx = 0;
             var carouselInterval = null;
             // Initial default values until first API response
@@ -201,15 +237,15 @@ function dsp_render_gallery_page() {
 
             function startCarousel() {
                 if (carouselInterval) clearInterval(carouselInterval);
-                if (imgEls.length < 2) return;
+                if (slideEls.length < 2) return;
                 carouselInterval = setInterval(function() {
-                    imgEls[idx].classList.remove('active');
-                    idx = (idx + 1) % imgEls.length;
-                    imgEls[idx].classList.add('active');
+                    slideEls[idx].classList.remove('active');
+                    idx = (idx + 1) % slideEls.length;
+                    slideEls[idx].classList.add('active');
                 }, slideDelay);
             }
 
-            function renderImages(data) {
+            function renderSlides(data) {
                 // Update intervals if provided in response
                 if (data.settings) {
                     if (data.settings.refresh_interval) {
@@ -220,51 +256,72 @@ function dsp_render_gallery_page() {
                     }
                 }
                 
-                // Get images from response
-                var images = data.images || [];
+                // Get slides from response
+                var slides = data.slides || [];
                 
-                // Remove old images
-                imgEls.forEach(function(img) { img.remove(); });
-                imgEls = [];
-                if (!images || !images.length) {
+                // Remove old slides
+                slideEls.forEach(function(slide) { slide.remove(); });
+                slideEls = [];
+                if (!slides || !slides.length) {
                     if (!loading) {
                         loading = document.createElement('p');
                         loading.id = 'dsp-loading';
                         carousel.appendChild(loading);
                     }
                     /* translators: category name */
-                    loading.textContent = <?php echo wp_json_encode(sprintf(__('No images found for category "%s".', 'digital-signage'), $category_name)); ?>;
+                    loading.textContent = <?php echo wp_json_encode(sprintf(__('No content found for category "%s".', 'digital-signage'), $category_name)); ?>;
                     return;
                 }
                 if (loading) loading.remove();
-                images.forEach(function(url, i) {
-                    var img = document.createElement('img');
-                    img.src = url;
-                    img.alt = 'Gallery Image';
-                    carousel.appendChild(img);
-                    imgEls.push(img);
+                
+                slides.forEach(function(slide, i) {
+                    var slideEl = document.createElement('div');
+                    slideEl.classList.add('slide');
+                    
+                    if (slide.type === 'image') {
+                        var img = document.createElement('img');
+                        img.src = slide.content;
+                        img.alt = 'Gallery Image';
+                        slideEl.appendChild(img);
+                    } else if (slide.type === 'html') {
+                        var contentDiv = document.createElement('div');
+                        contentDiv.classList.add('html-content');
+                        if (slide.title) {
+                            var title = document.createElement('h2');
+                            title.textContent = slide.title;
+                            contentDiv.appendChild(title);
+                        }
+                        var contentContainer = document.createElement('div');
+                        contentContainer.innerHTML = slide.content;
+                        contentDiv.appendChild(contentContainer);
+                        slideEl.appendChild(contentDiv);
+                    }
+                    
+                    carousel.appendChild(slideEl);
+                    slideEls.push(slideEl);
                 });
+                
                 // Reset index if out of bounds
-                if (idx >= imgEls.length) idx = 0;
-                imgEls.forEach(function(img, i) {
-                    img.className = (i === idx) ? 'active' : '';
+                if (idx >= slideEls.length) idx = 0;
+                slideEls.forEach(function(slide, i) {
+                    slide.className = 'slide' + (i === idx ? ' active' : '');
                 });
                 startCarousel();
             }
 
-            function fetchImages() {
+            function fetchContent() {
                 fetch(<?php echo wp_json_encode(esc_url_raw(rest_url('dsp/v1/images'))); ?>)
                     .then(function(res) { return res.json(); })
                     .then(function(data) {
-                        renderImages(data);
+                        renderSlides(data);
                     })
                     .catch(function() {
-                        if (loading) loading.textContent = <?php echo wp_json_encode(__('Failed to load images.', 'digital-signage')); ?>;
+                        if (loading) loading.textContent = <?php echo wp_json_encode(__('Failed to load content.', 'digital-signage')); ?>;
                     });
             }
 
-            fetchImages();
-            setInterval(fetchImages, refreshInterval);
+            fetchContent();
+            setInterval(fetchContent, refreshInterval);
         })();
         </script>
     </body>
