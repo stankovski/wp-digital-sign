@@ -17,9 +17,22 @@ if (!defined('ABSPATH')) exit;
 function dsp_register_image_sizes() {
     $width = intval(get_option('dsp_image_width', 1260));
     $height = intval(get_option('dsp_image_height', 940));
+    
+    // Remove previously registered size if it exists
+    if (has_image_size('dsp-gallery-thumb')) {
+        remove_image_size('dsp-gallery-thumb');
+    }
+    
+    // Register with current settings values
     add_image_size('dsp-gallery-thumb', $width, $height, false);
 }
-dsp_register_image_sizes(); // Call directly, not via hook
+
+// Call directly during plugin initialization
+dsp_register_image_sizes(); 
+
+// Hook to option updates to regenerate image sizes when settings change
+add_action('update_option_dsp_image_width', 'dsp_register_image_sizes');
+add_action('update_option_dsp_image_height', 'dsp_register_image_sizes');
 
 // Register custom rewrite endpoint
 function dsp_add_gallery_rewrite() {
