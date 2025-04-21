@@ -104,7 +104,7 @@ function dsp_admin_scripts($hook) {
 
 // AJAX handler for thumbnail cleanup
 function dsp_cleanup_thumbnails_handler() {
-    if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'dsp_cleanup_nonce')) {
+    if (!isset($_POST['nonce']) || !wp_verify_nonce(wp_unslash($_POST['nonce']), 'dsp_cleanup_nonce')) {
         wp_send_json_error(__('Security check failed.', 'digital-signage'));
     }
     
@@ -224,6 +224,12 @@ function dsp_render_settings_page() {
             <br>
             <a href="<?php echo esc_html($site_url); ?>"><?php echo esc_html($site_url); ?></a>
         </div>
+        
+        <div class="notice notice-warning inline">
+            <p><strong><?php esc_html_e('Cache Notice:', 'digital-signage'); ?></strong> <?php esc_html_e('If you are using a caching plugin or CDN, you may need to exclude the REST API endpoint from caching:', 'digital-signage'); ?> <code><?php echo esc_html(rest_url('dsp/v1/slides')); ?></code></p>
+            <p><?php esc_html_e('This ensures the digital signage displays will always show fresh content according to your refresh settings.', 'digital-signage'); ?></p>
+        </div>
+        
         <form method="post" action="options.php">
             <?php settings_fields('dsp_settings_group'); ?>
             <?php do_settings_sections('dsp_settings_group'); ?>

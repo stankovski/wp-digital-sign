@@ -74,7 +74,7 @@ require_once plugin_dir_path(__FILE__) . 'settings.php';
 
 // REST API endpoint for gallery images
 add_action('rest_api_init', function () {
-    register_rest_route('dsp/v1', '/images', [
+    register_rest_route('dsp/v1', '/slides', [
         'methods' => 'GET',
         'callback' => function () {
             $category_name = get_option('dsp_category_name', 'news');
@@ -268,7 +268,7 @@ function dsp_render_gallery_page() {
                         loading.id = 'dsp-loading';
                         carousel.appendChild(loading);
                     }
-                    /* translators: category name */
+                    /* translators: %s: category name */
                     loading.textContent = <?php echo wp_json_encode(sprintf(__('No content found for category "%s".', 'digital-signage'), $category_name)); ?>;
                     return;
                 }
@@ -310,7 +310,7 @@ function dsp_render_gallery_page() {
             }
 
             function fetchContent() {
-                fetch(<?php echo wp_json_encode(esc_url_raw(rest_url('dsp/v1/images'))); ?>)
+                fetch(<?php echo wp_json_encode(esc_url_raw(rest_url('dsp/v1/slides'))); ?>)
                     .then(function(res) { return res.json(); })
                     .then(function(data) {
                         renderSlides(data);
