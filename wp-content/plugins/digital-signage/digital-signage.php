@@ -13,6 +13,62 @@ License URI: https://opensource.org/licenses/MIT
 
 if (!defined('ABSPATH')) exit;
 
+// Include QR code generator
+require_once plugin_dir_path(__FILE__) . 'qrcode.php';
+
+// Define QR code directory
+define('DSP_QRCODE_DIR', WP_CONTENT_DIR . '/uploads/dsp-qrcodes/');
+define('DSP_QRCODE_URL', content_url('/uploads/dsp-qrcodes/'));
+
+// Create QR code directory if it doesn't exist
+function dsp_create_qrcode_dir() {
+    if (!file_exists(DSP_QRCODE_DIR)) {
+        wp_mkdir_p(DSP_QRCODE_DIR);
+        // Create .htaccess to allow direct access to QR code images
+        $htaccess = "# Allow direct access to QR code images\n";
+        $htaccess .= "<IfModule mod_rewrite.c>\n";
+        $htaccess .= "RewriteEngine Off\n";
+        $htaccess .= "</IfModule>\n";
+        file_put_contents(DSP_QRCODE_DIR . '.htaccess', $htaccess);
+    }
+}
+register_activation_hook(__FILE__, 'dsp_create_qrcode_dir');
+
+// Generate QR code for a post URL
+function dsp_generate_qrcode($post_id) {
+    $post_url = get_permalink($post_id);
+    $filename = 'qr-' . md5($post_url) . '.png';
+    $file_path = DSP_QRCODE_DIR . $filename;
+    $file_url = DSP_QRCODE_URL . $filename;
+    
+    // Check if QR code exists already
+    if (!file_exists($file_path)) {
+        // Create directory if it doesn't exist (in case it was deleted)
+        dsp_create_qrcode_dir();
+        
+        // Generate QR code
+        $options = [
+            'w' => 200,  // Width
+            'h' => 200,  // Height
+            'bc' => 'FFFFFF', // Background color
+            'fc' => '000000'  // Foreground color
+        ];
+        
+        $qr = new QRCode($post_url, $options);
+        $image = $qr->render_image();
+        
+        // Add transparency to the QR code background
+        imagealphablending($image, false);
+        imagesavealpha($image, true);
+        
+        // Save the QR code
+        imagepng($image, $file_path);
+        imagedestroy($image);
+    }
+    
+    return $file_url;
+}
+
 // Register custom image size (do not hook to after_setup_theme)
 function dsp_register_image_sizes() {
     $width = intval(get_option('dsp_image_width', 1260));
@@ -44,6 +100,7 @@ add_action('init', 'dsp_add_gallery_rewrite');
 function dsp_activate_plugin() {
     dsp_add_gallery_rewrite();
     flush_rewrite_rules();
+    dsp_create_qrcode_dir();
 }
 register_activation_hook(__FILE__, 'dsp_activate_plugin');
 
@@ -96,6 +153,9 @@ add_action('rest_api_init', function () {
                     $post_id = get_the_ID();
                     $thumb_id = get_post_thumbnail_id($post_id);
                     
+                    // Generate QR code for this post
+                    $qr_code_url = dsp_generate_qrcode($post_id);
+                    
                     if ($thumb_id) {
                         // Check if the custom size exists, generate if not
                         $meta = wp_get_attachment_metadata($thumb_id);
@@ -114,7 +174,10 @@ add_action('rest_api_init', function () {
                         if ($img_url) {
                             $slides[] = [
                                 'type' => 'image',
-                                'content' => $img_url
+                                'content' => $img_url,
+                                'qrcode' => $qr_code_url,
+                                'post_title' => get_the_title(),
+                                'post_url' => get_permalink($post_id)
                             ];
                         }
                     } else {
@@ -124,7 +187,9 @@ add_action('rest_api_init', function () {
                             $slides[] = [
                                 'type' => 'html',
                                 'content' => $content,
-                                'title' => get_the_title()
+                                'title' => get_the_title(),
+                                'qrcode' => $qr_code_url,
+                                'post_url' => get_permalink($post_id)
                             ];
                         }
                     }
@@ -192,6 +257,7 @@ function dsp_render_gallery_page() {
                 padding: 0;
                 box-sizing: border-box;
                 overflow: hidden;
+                position: relative;
             }
             .gallery img {
                 width: 100%;
@@ -214,6 +280,22 @@ function dsp_render_gallery_page() {
             }
             .gallery .html-content h2 {
                 margin-top: 0;
+            }
+            .qrcode-overlay {
+                position: absolute;
+                bottom: 20px;
+                left: 20px;
+                width: 100px;
+                height: 100px;
+                background-color: rgba(255, 255, 255, 0.7);
+                padding: 5px;
+                border-radius: 5px;
+                z-index: 10;
+            }
+            .qrcode-overlay img {
+                width: 100%;
+                height: 100%;
+                object-fit: contain;
             }
         </style>
     </head>
@@ -281,7 +363,7 @@ function dsp_render_gallery_page() {
                     if (slide.type === 'image') {
                         var img = document.createElement('img');
                         img.src = slide.content;
-                        img.alt = 'Gallery Image';
+                        img.alt = slide.post_title || 'Gallery Image';
                         slideEl.appendChild(img);
                     } else if (slide.type === 'html') {
                         var contentDiv = document.createElement('div');
@@ -295,6 +377,17 @@ function dsp_render_gallery_page() {
                         contentContainer.innerHTML = slide.content;
                         contentDiv.appendChild(contentContainer);
                         slideEl.appendChild(contentDiv);
+                    }
+                    
+                    // Add QR code overlay
+                    if (slide.qrcode) {
+                        var qrDiv = document.createElement('div');
+                        qrDiv.classList.add('qrcode-overlay');
+                        var qrImg = document.createElement('img');
+                        qrImg.src = slide.qrcode;
+                        qrImg.alt = 'Scan for more information';
+                        qrDiv.appendChild(qrImg);
+                        slideEl.appendChild(qrDiv);
                     }
                     
                     carousel.appendChild(slideEl);
