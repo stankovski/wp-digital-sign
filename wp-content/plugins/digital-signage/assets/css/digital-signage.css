@@ -29,10 +29,8 @@ body {
 
 .digsign-layout-sidebar {
     flex: 4;
-    overflow: auto;
-    padding: 15px;
-    background-color: #f8f8f8;
-    border-left: 1px solid #ddd;
+    overflow: visible;
+    padding: 0px;
 }
 
 .digsign-layout-header {
