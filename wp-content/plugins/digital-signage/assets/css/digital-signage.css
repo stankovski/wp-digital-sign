@@ -21,7 +21,7 @@ body {
 
 .digsign-layout-main {
     flex: 6;
-    overflow: hidden;
+    overflow: visible;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -163,34 +163,4 @@ body {
 /* Style for right panel content */
 .digsign-layout-sidebar p:first-child {
     margin-top: 0;
-}
-
-/* Responsive adjustments for smaller screens */
-@media (max-width: 1024px) {
-    .digsign-layout-container {
-        flex-direction: column;
-    }
-    
-    .digsign-layout-main, 
-    .digsign-layout-sidebar {
-        width: 100%;
-        flex: none;
-    }
-    
-    .digsign-layout-sidebar {
-        height: auto;
-        max-height: 30vh;
-        border-left: none;
-        border-top: 1px solid #ddd;
-    }
-    
-    .digsign-layout-header-panels .digsign-layout-container,
-    .digsign-layout-two-panels .digsign-layout-container {
-        height: auto;
-    }
-    
-    .gallery .slide {
-        width: 100% !important;
-        height: auto !important;
-    }
 }
