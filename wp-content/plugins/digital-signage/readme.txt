@@ -1,9 +1,9 @@
 === Digital Signage ===
-Contributors: example
+Contributors: stankovski
 Tags: digital signage, slideshow, gallery
 Requires at least: 5.0
 Tested up to: 6.8
-Stable tag: 1.0.0
+Stable tag: 1.0.1
 Requires PHP: 7.0
 License: MIT
 License URI: https://opensource.org/licenses/MIT

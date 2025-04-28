@@ -3,33 +3,33 @@
 if (!defined('ABSPATH')) exit;
 
 // Register settings
-function dsp_register_settings() {
-    register_setting('dsp_settings_group', 'dsp_category_name', [
+function digsign_register_settings() {
+    register_setting('digsign_settings_group', 'digsign_category_name', [
         'type' => 'string',
         'default' => 'news',
         'sanitize_callback' => 'sanitize_text_field'
     ]);
-    register_setting('dsp_settings_group', 'dsp_image_width', [
+    register_setting('digsign_settings_group', 'digsign_image_width', [
         'type' => 'integer',
         'default' => 1260,
         'sanitize_callback' => 'absint'
     ]);
-    register_setting('dsp_settings_group', 'dsp_image_height', [
+    register_setting('digsign_settings_group', 'digsign_image_height', [
         'type' => 'integer',
         'default' => 940,
         'sanitize_callback' => 'absint'
     ]);
-    register_setting('dsp_settings_group', 'dsp_refresh_interval', [
+    register_setting('digsign_settings_group', 'digsign_refresh_interval', [
         'type' => 'integer',
         'default' => 10,
         'sanitize_callback' => 'absint'
     ]);
-    register_setting('dsp_settings_group', 'dsp_slide_delay', [
+    register_setting('digsign_settings_group', 'digsign_slide_delay', [
         'type' => 'integer',
         'default' => 5,
         'sanitize_callback' => 'absint'
     ]);
-    register_setting('dsp_settings_group', 'dsp_enable_qrcodes', [
+    register_setting('digsign_settings_group', 'digsign_enable_qrcodes', [
         'type' => 'boolean',
         'default' => true,
         'sanitize_callback' => 'rest_sanitize_boolean'
@@ -37,13 +37,13 @@ function dsp_register_settings() {
 }
 
 // Add settings page
-function dsp_add_settings_page() {
+function digsign_add_settings_page() {
     add_options_page(
         'Digital Signage Settings',
         'Digital Signage',
         'manage_options',
-        'dsp-settings',
-        'dsp_render_settings_page'
+        'digsign-settings',
+        'digsign_render_settings_page'
     );
 }
 
@@ -52,23 +52,23 @@ function dsp_add_settings_page() {
  * 
  * @return boolean True if permalinks are set to plain, false otherwise
  */
-function dsp_has_plain_permalinks() {
+function digsign_has_plain_permalinks() {
     $permalink_structure = get_option('permalink_structure');
     return empty($permalink_structure);
 }
 
 // Register and enqueue admin scripts
-function dsp_admin_scripts($hook) {
-    if ('settings_page_dsp-settings' !== $hook) {
+function digsign_admin_scripts($hook) {
+    if ('settings_page_digsign-settings' !== $hook) {
         return;
     }
     
-    wp_register_script('dsp-admin-script', '', array('jquery'), '1.0', true);
-    wp_enqueue_script('dsp-admin-script');
+    wp_register_script('digsign-admin-script', '', array('jquery'), '1.0', true);
+    wp_enqueue_script('digsign-admin-script');
     
-    wp_localize_script('dsp-admin-script', 'dsp_admin', array(
+    wp_localize_script('digsign-admin-script', 'digsign_admin', array(
         'ajax_url' => admin_url('admin-ajax.php'),
-        'nonce' => wp_create_nonce('dsp_cleanup_nonce'),
+        'nonce' => wp_create_nonce('digsign_cleanup_nonce'),
         'confirm_message' => __('Are you sure you want to delete old image thumbnails? This cannot be undone.', 'digital-signage'),
         'processing_message' => __('Processing...', 'digital-signage'),
     ));
@@ -76,22 +76,22 @@ function dsp_admin_scripts($hook) {
     // Add inline script
     $script = "
         jQuery(document).ready(function($) {
-            $('#dsp-cleanup-button').on('click', function(e) {
+            $('#digsign-cleanup-button').on('click', function(e) {
                 e.preventDefault();
                 
-                if (!confirm(dsp_admin.confirm_message)) {
+                if (!confirm(digsign_admin.confirm_message)) {
                     return;
                 }
                 
-                const resultDiv = $('#dsp-cleanup-result');
-                resultDiv.html('<p>' + dsp_admin.processing_message + '</p>').show();
+                const resultDiv = $('#digsign-cleanup-result');
+                resultDiv.html('<p>' + digsign_admin.processing_message + '</p>').show();
                 
                 $.ajax({
-                    url: dsp_admin.ajax_url,
+                    url: digsign_admin.ajax_url,
                     type: 'POST',
                     data: {
-                        action: 'dsp_cleanup_thumbnails',
-                        nonce: dsp_admin.nonce
+                        action: 'digsign_cleanup_thumbnails',
+                        nonce: digsign_admin.nonce
                     },
                     success: function(response) {
                         resultDiv.html('<p>' + response.data + '</p>');
@@ -104,12 +104,12 @@ function dsp_admin_scripts($hook) {
         });
     ";
     
-    wp_add_inline_script('dsp-admin-script', $script);
+    wp_add_inline_script('digsign-admin-script', $script);
 }
 
 // AJAX handler for thumbnail cleanup
-function dsp_cleanup_thumbnails_handler() {
-    if (!isset($_POST['nonce']) || !wp_verify_nonce(wp_unslash($_POST['nonce']), 'dsp_cleanup_nonce')) {
+function digsign_cleanup_thumbnails_handler() {
+    if (!isset($_POST['nonce']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['nonce'])), 'digsign_cleanup_nonce')) {
         wp_send_json_error(__('Security check failed.', 'digital-signage'));
     }
     
@@ -117,7 +117,7 @@ function dsp_cleanup_thumbnails_handler() {
         wp_send_json_error(__('You do not have permission to perform this action.', 'digital-signage'));
     }
     
-    $result = dsp_cleanup_gallery_thumbnails();
+    $result = digsign_cleanup_gallery_thumbnails();
     
     if (is_wp_error($result)) {
         wp_send_json_error($result->get_error_message());
@@ -133,11 +133,11 @@ function dsp_cleanup_thumbnails_handler() {
  * 
  * @return int|WP_Error Number of deleted files or WP_Error
  */
-function dsp_cleanup_gallery_thumbnails() {
+function digsign_cleanup_gallery_thumbnails() {
     global $wpdb;
     
     try {
-        // Get all attachment IDs with dsp-gallery-thumb in their metadata
+        // Get all attachment IDs with digsign-gallery-thumb in their metadata
         $attachments = [];
         $query = new WP_Query([
             'post_type' => 'attachment',
@@ -146,7 +146,7 @@ function dsp_cleanup_gallery_thumbnails() {
             'meta_query' => [
                 [
                     'key' => '_wp_attachment_metadata',
-                    'value' => 'dsp-gallery-thumb',
+                    'value' => 'digsign-gallery-thumb',
                     'compare' => 'LIKE'
                 ]
             ],
@@ -176,13 +176,13 @@ function dsp_cleanup_gallery_thumbnails() {
         foreach ($attachments as $attachment) {
             $meta = maybe_unserialize($attachment->meta_value);
             
-            if (!isset($meta['sizes']['dsp-gallery-thumb']) || !isset($meta['file'])) {
+            if (!isset($meta['sizes']['digsign-gallery-thumb']) || !isset($meta['file'])) {
                 continue;
             }
             
             // Get path to the thumbnail
             $file_dir = dirname($meta['file']);
-            $thumb_file = $meta['sizes']['dsp-gallery-thumb']['file'];
+            $thumb_file = $meta['sizes']['digsign-gallery-thumb']['file'];
             $thumb_path = $base_dir . '/' . $file_dir . '/' . $thumb_file;
             
             // Delete the file if it exists
@@ -191,7 +191,7 @@ function dsp_cleanup_gallery_thumbnails() {
             }
             
             // Remove from metadata
-            unset($meta['sizes']['dsp-gallery-thumb']);
+            unset($meta['sizes']['digsign-gallery-thumb']);
             update_post_meta($attachment->post_id, '_wp_attachment_metadata', $meta);
         }
         
@@ -203,16 +203,16 @@ function dsp_cleanup_gallery_thumbnails() {
 }
 
 // Render settings page
-function dsp_render_settings_page() {
+function digsign_render_settings_page() {
     // Fetch categories
     $categories = get_categories([
         'hide_empty' => false,
         'orderby' => 'name',
         'order' => 'ASC',
     ]);
-    $selected_category = get_option('dsp_category_name', 'news');
+    $selected_category = get_option('digsign_category_name', 'news');
     $site_url = esc_url(home_url('/digital-signage/'));
-    $has_plain_permalinks = dsp_has_plain_permalinks();
+    $has_plain_permalinks = digsign_has_plain_permalinks();
     ?>
     <div class="wrap">
         <h1>Digital Signage Settings</h1>
@@ -231,18 +231,18 @@ function dsp_render_settings_page() {
         </div>
         
         <div class="notice notice-warning inline">
-            <p><strong><?php esc_html_e('Cache Notice:', 'digital-signage'); ?></strong> <?php esc_html_e('If you are using a caching plugin or CDN, you may need to exclude the REST API endpoint from caching:', 'digital-signage'); ?> <code><?php echo esc_html(rest_url('dsp/v1/slides')); ?></code></p>
+            <p><strong><?php esc_html_e('Cache Notice:', 'digital-signage'); ?></strong> <?php esc_html_e('If you are using a caching plugin or CDN, you may need to exclude the REST API endpoint from caching:', 'digital-signage'); ?> <code><?php echo esc_html(rest_url('digsign/v1/slides')); ?></code></p>
             <p><?php esc_html_e('This ensures the digital signage displays will always show fresh content according to your refresh settings.', 'digital-signage'); ?></p>
         </div>
         
         <form method="post" action="options.php">
-            <?php settings_fields('dsp_settings_group'); ?>
-            <?php do_settings_sections('dsp_settings_group'); ?>
+            <?php settings_fields('digsign_settings_group'); ?>
+            <?php do_settings_sections('digsign_settings_group'); ?>
             <table class="form-table">
                 <tr valign="top">
                     <th scope="row">Category Name</th>
                     <td>
-                        <select name="dsp_category_name">
+                        <select name="digsign_category_name">
                             <?php foreach ($categories as $cat): ?>
                                 <option value="<?php echo esc_attr($cat->slug); ?>" <?php selected($selected_category, $cat->slug); ?>>
                                     <?php echo esc_html($cat->name); ?>
@@ -255,28 +255,28 @@ function dsp_render_settings_page() {
                 <tr valign="top">
                     <th scope="row">Image Width</th>
                     <td>
-                        <input type="number" name="dsp_image_width" value="<?php echo esc_attr(get_option('dsp_image_width', 1260)); ?>" min="1" />
+                        <input type="number" name="digsign_image_width" value="<?php echo esc_attr(get_option('digsign_image_width', 1260)); ?>" min="1" />
                         <p class="description">Width in pixels for signage images.</p>
                     </td>
                 </tr>
                 <tr valign="top">
                     <th scope="row">Image Height</th>
                     <td>
-                        <input type="number" name="dsp_image_height" value="<?php echo esc_attr(get_option('dsp_image_height', 940)); ?>" min="1" />
+                        <input type="number" name="digsign_image_height" value="<?php echo esc_attr(get_option('digsign_image_height', 940)); ?>" min="1" />
                         <p class="description">Height in pixels for signage images.</p>
                     </td>
                 </tr>
                 <tr valign="top">
                     <th scope="row">Page Refresh Interval</th>
                     <td>
-                        <input type="number" name="dsp_refresh_interval" value="<?php echo esc_attr(get_option('dsp_refresh_interval', 10)); ?>" min="1" />
+                        <input type="number" name="digsign_refresh_interval" value="<?php echo esc_attr(get_option('digsign_refresh_interval', 10)); ?>" min="1" />
                         <p class="description">Interval in seconds to refresh the gallery images.</p>
                     </td>
                 </tr>
                 <tr valign="top">
                     <th scope="row">Slide Delay</th>
                     <td>
-                        <input type="number" name="dsp_slide_delay" value="<?php echo esc_attr(get_option('dsp_slide_delay', 5)); ?>" min="1" />
+                        <input type="number" name="digsign_slide_delay" value="<?php echo esc_attr(get_option('digsign_slide_delay', 5)); ?>" min="1" />
                         <p class="description">Time in seconds each image is shown before switching to the next slide.</p>
                     </td>
                 </tr>
@@ -284,7 +284,7 @@ function dsp_render_settings_page() {
                     <th scope="row">QR Codes</th>
                     <td>
                         <label>
-                            <input type="checkbox" name="dsp_enable_qrcodes" value="1" <?php checked(get_option('dsp_enable_qrcodes', true)); ?> />
+                            <input type="checkbox" name="digsign_enable_qrcodes" value="1" <?php checked(get_option('digsign_enable_qrcodes', true)); ?> />
                             Enable QR codes for each slide
                         </label>
                         <p class="description">When enabled, a QR code linking to the post will be displayed on each slide.</p>
@@ -298,16 +298,16 @@ function dsp_render_settings_page() {
         
         <h2><?php esc_html_e('Image Management', 'digital-signage'); ?></h2>
         <p><?php esc_html_e('If you\'ve changed image dimensions, you may want to clean up old thumbnails to save disk space.', 'digital-signage'); ?></p>
-        <button id="dsp-cleanup-button" class="button button-secondary">
+        <button id="digsign-cleanup-button" class="button button-secondary">
             <?php esc_html_e('Delete Old Thumbnails', 'digital-signage'); ?>
         </button>
-        <div id="dsp-cleanup-result" style="margin-top: 10px; display: none;"></div>
+        <div id="digsign-cleanup-result" style="margin-top: 10px; display: none;"></div>
     </div>
     <?php
 }
 
 // Hook all functions after they've been defined
-add_action('admin_init', 'dsp_register_settings');
-add_action('admin_menu', 'dsp_add_settings_page');
-add_action('admin_enqueue_scripts', 'dsp_admin_scripts');
-add_action('wp_ajax_dsp_cleanup_thumbnails', 'dsp_cleanup_thumbnails_handler');
+add_action('admin_init', 'digsign_register_settings');
+add_action('admin_menu', 'digsign_add_settings_page');
+add_action('admin_enqueue_scripts', 'digsign_admin_scripts');
+add_action('wp_ajax_digsign_cleanup_thumbnails', 'digsign_cleanup_thumbnails_handler');

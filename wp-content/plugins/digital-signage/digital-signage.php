@@ -2,7 +2,7 @@
 /*
 Plugin Name: Digital Signage
 Description: Adds a page that displays a digital signage gallery of images from your WordPress posts.
-Version: 1.0.0
+Version: 1.0.1
 Author: stankovski
 Author URI: https://github.com/stankovski/
 Text Domain: digital-signage
@@ -17,34 +17,34 @@ if (!defined('ABSPATH')) exit;
 require_once plugin_dir_path(__FILE__) . 'qrcode.php';
 
 // Define QR code directory
-define('DSP_QRCODE_DIR', WP_CONTENT_DIR . '/uploads/dsp-qrcodes/');
-define('DSP_QRCODE_URL', content_url('/uploads/dsp-qrcodes/'));
+define('DIGSIGN_QRCODE_DIR', WP_CONTENT_DIR . '/uploads/digsign-qrcodes/');
+define('DIGSIGN_QRCODE_URL', content_url('/uploads/digsign-qrcodes/'));
 
 // Create QR code directory if it doesn't exist
-function dsp_create_qrcode_dir() {
-    if (!file_exists(DSP_QRCODE_DIR)) {
-        wp_mkdir_p(DSP_QRCODE_DIR);
+function digsign_create_qrcode_dir() {
+    if (!file_exists(DIGSIGN_QRCODE_DIR)) {
+        wp_mkdir_p(DIGSIGN_QRCODE_DIR);
         // Create .htaccess to allow direct access to QR code images
         $htaccess = "# Allow direct access to QR code images\n";
         $htaccess .= "<IfModule mod_rewrite.c>\n";
         $htaccess .= "RewriteEngine Off\n";
         $htaccess .= "</IfModule>\n";
-        file_put_contents(DSP_QRCODE_DIR . '.htaccess', $htaccess);
+        file_put_contents(DIGSIGN_QRCODE_DIR . '.htaccess', $htaccess);
     }
 }
-register_activation_hook(__FILE__, 'dsp_create_qrcode_dir');
+register_activation_hook(__FILE__, 'digsign_create_qrcode_dir');
 
 // Generate QR code for a post URL
-function dsp_generate_qrcode($post_id) {
+function digsign_generate_qrcode($post_id) {
     $post_url = get_permalink($post_id);
     $filename = 'qr-' . md5($post_url) . '.png';
-    $file_path = DSP_QRCODE_DIR . $filename;
-    $file_url = DSP_QRCODE_URL . $filename;
+    $file_path = DIGSIGN_QRCODE_DIR . $filename;
+    $file_url = DIGSIGN_QRCODE_URL . $filename;
     
     // Check if QR code exists already
     if (!file_exists($file_path)) {
         // Create directory if it doesn't exist (in case it was deleted)
-        dsp_create_qrcode_dir();
+        digsign_create_qrcode_dir();
         
         // Generate QR code
         $options = [
@@ -54,7 +54,7 @@ function dsp_generate_qrcode($post_id) {
             'fc' => '000000'  // Foreground color
         ];
         
-        $qr = new QRCode($post_url, $options);
+        $qr = new DigSign\QRCode($post_url, $options);
         $image = $qr->render_image();
         
         // Add transparency to the QR code background
@@ -70,77 +70,98 @@ function dsp_generate_qrcode($post_id) {
 }
 
 // Register custom image size (do not hook to after_setup_theme)
-function dsp_register_image_sizes() {
-    $width = intval(get_option('dsp_image_width', 1260));
-    $height = intval(get_option('dsp_image_height', 940));
+function digsign_register_image_sizes() {
+    $width = intval(get_option('digsign_image_width', 1260));
+    $height = intval(get_option('digsign_image_height', 940));
     
     // Remove previously registered size if it exists
-    if (has_image_size('dsp-gallery-thumb')) {
-        remove_image_size('dsp-gallery-thumb');
+    if (has_image_size('digsign-gallery-thumb')) {
+        remove_image_size('digsign-gallery-thumb');
     }
     
     // Register with current settings values
-    add_image_size('dsp-gallery-thumb', $width, $height, false);
+    add_image_size('digsign-gallery-thumb', $width, $height, false);
 }
 
 // Call directly during plugin initialization
-dsp_register_image_sizes(); 
+digsign_register_image_sizes(); 
 
 // Hook to option updates to regenerate image sizes when settings change
-add_action('update_option_dsp_image_width', 'dsp_register_image_sizes');
-add_action('update_option_dsp_image_height', 'dsp_register_image_sizes');
+add_action('update_option_digsign_image_width', 'digsign_register_image_sizes');
+add_action('update_option_digsign_image_height', 'digsign_register_image_sizes');
 
 // Register custom rewrite endpoint
-function dsp_add_gallery_rewrite() {
-    add_rewrite_rule('^digital-signage/?$', 'index.php?dsp_gallery=1', 'top');
+function digsign_add_gallery_rewrite() {
+    add_rewrite_rule('^digital-signage/?$', 'index.php?digsign_gallery=1', 'top');
 }
-add_action('init', 'dsp_add_gallery_rewrite');
+add_action('init', 'digsign_add_gallery_rewrite');
 
 // Flush rewrite rules on plugin activation
-function dsp_activate_plugin() {
-    dsp_add_gallery_rewrite();
+function digsign_activate_plugin() {
+    digsign_add_gallery_rewrite();
     flush_rewrite_rules();
-    dsp_create_qrcode_dir();
+    digsign_create_qrcode_dir();
 }
-register_activation_hook(__FILE__, 'dsp_activate_plugin');
+register_activation_hook(__FILE__, 'digsign_activate_plugin');
 
 // Optional: Flush rewrite rules on plugin deactivation
-function dsp_deactivate_plugin() {
+function digsign_deactivate_plugin() {
     flush_rewrite_rules();
 }
-register_deactivation_hook(__FILE__, 'dsp_deactivate_plugin');
+register_deactivation_hook(__FILE__, 'digsign_deactivate_plugin');
 
 // Register query var
-function dsp_add_query_vars($vars) {
-    $vars[] = 'dsp_gallery';
+function digsign_add_query_vars($vars) {
+    $vars[] = 'digsign_gallery';
     return $vars;
 }
-add_filter('query_vars', 'dsp_add_query_vars');
+add_filter('query_vars', 'digsign_add_query_vars');
+
+// Register and enqueue scripts and styles for the digital signage page
+function digsign_register_scripts() {
+    // Register styles
+    wp_register_style(
+        'digsign-gallery-style',
+        plugins_url('assets/css/digital-signage.css', __FILE__),
+        array(),
+        '1.0.0'
+    );
+    
+    // Register scripts
+    wp_register_script(
+        'digsign-gallery-script',
+        plugins_url('assets/js/digital-signage.js', __FILE__),
+        array(), 
+        '1.0.0',
+        true
+    );
+}
+add_action('init', 'digsign_register_scripts');
 
 // Template redirect for gallery page
-function dsp_template_redirect() {
-    if (get_query_var('dsp_gallery')) {
-        dsp_render_gallery_page();
+function digsign_template_redirect() {
+    if (get_query_var('digsign_gallery')) {
+        digsign_render_gallery_page();
         exit;
     }
 }
-add_action('template_redirect', 'dsp_template_redirect');
+add_action('template_redirect', 'digsign_template_redirect');
 
 // --- Settings Page ---
 require_once plugin_dir_path(__FILE__) . 'settings.php';
 
 // REST API endpoint for gallery images
 add_action('rest_api_init', function () {
-    register_rest_route('dsp/v1', '/slides', [
+    register_rest_route('digsign/v1', '/slides', [
         'methods' => 'GET',
         'callback' => function () {
-            $category_name = get_option('dsp_category_name', 'news');
-            $width = intval(get_option('dsp_image_width', 1260));
-            $height = intval(get_option('dsp_image_height', 940));
-            $image_size = 'dsp-gallery-thumb';
-            $refresh_interval = intval(get_option('dsp_refresh_interval', 10));
-            $slide_delay = intval(get_option('dsp_slide_delay', 5));
-            $enable_qrcodes = (bool)get_option('dsp_enable_qrcodes', true);
+            $category_name = get_option('digsign_category_name', 'news');
+            $width = intval(get_option('digsign_image_width', 1260));
+            $height = intval(get_option('digsign_image_height', 940));
+            $image_size = 'digsign-gallery-thumb';
+            $refresh_interval = intval(get_option('digsign_refresh_interval', 10));
+            $slide_delay = intval(get_option('digsign_slide_delay', 5));
+            $enable_qrcodes = (bool)get_option('digsign_enable_qrcodes', true);
             
             $args = [
                 'category_name' => $category_name,
@@ -156,7 +177,7 @@ add_action('rest_api_init', function () {
                     $thumb_id = get_post_thumbnail_id($post_id);
                     
                     // Generate QR code only if enabled
-                    $qr_code_url = $enable_qrcodes ? dsp_generate_qrcode($post_id) : '';
+                    $qr_code_url = $enable_qrcodes ? digsign_generate_qrcode($post_id) : '';
                     
                     if ($thumb_id) {
                         // Check if the custom size exists, generate if not
@@ -212,222 +233,66 @@ add_action('rest_api_init', function () {
 });
 
 // Render gallery HTML
-function dsp_render_gallery_page() {
-    $width = intval(get_option('dsp_image_width', 1260));
-    $height = intval(get_option('dsp_image_height', 940));
-    $category_name = esc_html(get_option('dsp_category_name', 'news'));
-    $refresh_interval = intval(get_option('dsp_refresh_interval', 10));
-    $slide_delay = intval(get_option('dsp_slide_delay', 5));
-    $enable_qrcodes = (bool)get_option('dsp_enable_qrcodes', true);
+function digsign_render_gallery_page() {
+    $width = intval(get_option('digsign_image_width', 1260));
+    $height = intval(get_option('digsign_image_height', 940));
+    $category_name = esc_html(get_option('digsign_category_name', 'news'));
+    $refresh_interval = intval(get_option('digsign_refresh_interval', 10));
+    $slide_delay = intval(get_option('digsign_slide_delay', 5));
+    $enable_qrcodes = (bool)get_option('digsign_enable_qrcodes', true);
+    
+    // Enqueue required styles and scripts
+    wp_enqueue_style('digsign-gallery-style');
+    wp_enqueue_script('digsign-gallery-script');
+    
+    // Add inline style for dynamic values
+    wp_add_inline_style('digsign-gallery-style', sprintf('
+        .gallery .slide {
+            width: %dpx;
+            height: %dpx;
+        }
+        .gallery .html-content {
+            max-height: %dpx;
+        }
+    ', $width, $height, $height - 40));
+    
+    // Add inline script for dynamic values
+    wp_add_inline_script('digsign-gallery-script', sprintf('
+        var digsignConfig = {
+            ajaxUrl: %s,
+            refreshInterval: %d,
+            slideDelay: %d,
+            enableQrCodes: %s,
+            categoryName: %s,
+            i18n: {
+                noContent: %s,
+                failedToLoad: %s
+            }
+        };
+    ', 
+        wp_json_encode(esc_url_raw(rest_url('digsign/v1/slides'))),
+        max(1, $refresh_interval) * 1000,
+        max(1, $slide_delay) * 1000,
+        $enable_qrcodes ? 'true' : 'false',
+        wp_json_encode($category_name),
+        wp_json_encode(sprintf(__('No content found for category "%s".', 'digital-signage'), $category_name)),
+        wp_json_encode(__('Failed to load content.', 'digital-signage'))
+    ));
+    
     ?>
     <!DOCTYPE html>
     <html>
     <head>
         <title>Digital Signage</title>
-        <style>
-            html, body {
-                height: 100%;
-                margin: 0;
-                padding: 0;
-                overflow: hidden;
-            }
-            body { 
-                font-family: Arial, sans-serif; 
-                margin: 0;
-                padding: 0;
-            }
-            .main-content {
-                margin: 0;
-                padding: 0;
-                height: 100%;
-            }
-            .gallery {
-                display: flex;
-                gap: 20px;
-                justify-content: center;
-                align-items: center;
-                min-height: <?php echo esc_attr($height); ?>px;
-                margin: 0;
-                padding: 0;
-            }
-            .gallery .slide {
-                width: <?php echo esc_attr($width); ?>px;
-                height: <?php echo esc_attr($height); ?>px;
-                max-width: 100%;
-                max-height: 100%;
-                border-radius: 0px;
-                display: none;
-                margin: 0;
-                padding: 0;
-                box-sizing: border-box;
-                overflow: hidden;
-                position: relative;
-            }
-            .gallery img {
-                width: 100%;
-                height: 100%;
-                object-fit: contain;
-                max-height: 100%;
-            }
-            .gallery .slide.active {
-                display: flex;
-                justify-content: center;
-                align-items: center;
-            }
-            .gallery .html-content {
-                overflow: auto;
-                background: #fff;
-                padding: 20px;
-                max-height: <?php echo esc_attr($height - 40); ?>px; /* Accounting for padding */
-                width: 100%;
-                box-sizing: border-box;
-            }
-            .gallery .html-content h2 {
-                margin-top: 0;
-            }
-            .qrcode-overlay {
-                position: absolute;
-                bottom: 20px;
-                left: 20px;
-                width: 100px;
-                height: 100px;
-                background-color: rgba(255, 255, 255, 0.7);
-                padding: 5px;
-                border-radius: 5px;
-                z-index: 10;
-                display: none; /* Hidden by default, controlled by JS */
-            }
-            .qrcode-overlay img {
-                width: 100%;
-                height: 100%;
-                object-fit: contain;
-            }
-        </style>
+        <?php wp_head(); ?>
     </head>
     <body>
         <div class="main-content">
-            <div class="gallery" id="dsp-carousel">
-                <p id="dsp-loading">Loading content...</p>
+            <div class="gallery" id="digsign-carousel">
+                <p id="digsign-loading">Loading content...</p>
             </div>
         </div>
-        <script>
-        // Async load images and run carousel
-        (function() {
-            var carousel = document.getElementById('dsp-carousel');
-            var loading = document.getElementById('dsp-loading');
-            var slideEls = [];
-            var idx = 0;
-            var carouselInterval = null;
-            // Initial default values until first API response
-            var refreshInterval = <?php echo esc_js(max(1, $refresh_interval) * 1000); ?>;
-            var slideDelay = <?php echo esc_js(max(1, $slide_delay) * 1000); ?>;
-            var enableQrCodes = <?php echo $enable_qrcodes ? 'true' : 'false'; ?>;
-
-            function startCarousel() {
-                if (carouselInterval) clearInterval(carouselInterval);
-                if (slideEls.length < 2) return;
-                carouselInterval = setInterval(function() {
-                    slideEls[idx].classList.remove('active');
-                    idx = (idx + 1) % slideEls.length;
-                    slideEls[idx].classList.add('active');
-                }, slideDelay);
-            }
-
-            function renderSlides(data) {
-                // Update intervals if provided in response
-                if (data.settings) {
-                    if (data.settings.refresh_interval) {
-                        refreshInterval = Math.max(1, data.settings.refresh_interval) * 1000;
-                    }
-                    if (data.settings.slide_delay) {
-                        slideDelay = Math.max(1, data.settings.slide_delay) * 1000;
-                    }
-                    if (data.settings.hasOwnProperty('enable_qrcodes')) {
-                        enableQrCodes = data.settings.enable_qrcodes;
-                    }
-                }
-                
-                // Get slides from response
-                var slides = data.slides || [];
-                
-                // Remove old slides
-                slideEls.forEach(function(slide) { slide.remove(); });
-                slideEls = [];
-                if (!slides || !slides.length) {
-                    if (!loading) {
-                        loading = document.createElement('p');
-                        loading.id = 'dsp-loading';
-                        carousel.appendChild(loading);
-                    }
-                    /* translators: %s: category name */
-                    loading.textContent = <?php echo wp_json_encode(sprintf(__('No content found for category "%s".', 'digital-signage'), $category_name)); ?>;
-                    return;
-                }
-                if (loading) loading.remove();
-                
-                slides.forEach(function(slide, i) {
-                    var slideEl = document.createElement('div');
-                    slideEl.classList.add('slide');
-                    
-                    if (slide.type === 'image') {
-                        var img = document.createElement('img');
-                        img.src = slide.content;
-                        img.alt = slide.post_title || 'Gallery Image';
-                        slideEl.appendChild(img);
-                    } else if (slide.type === 'html') {
-                        var contentDiv = document.createElement('div');
-                        contentDiv.classList.add('html-content');
-                        if (slide.title) {
-                            var title = document.createElement('h2');
-                            title.textContent = slide.title;
-                            contentDiv.appendChild(title);
-                        }
-                        var contentContainer = document.createElement('div');
-                        contentContainer.innerHTML = slide.content;
-                        contentDiv.appendChild(contentContainer);
-                        slideEl.appendChild(contentDiv);
-                    }
-                    
-                    // Add QR code overlay only if URL is provided
-                    if (slide.qrcode) {
-                        var qrDiv = document.createElement('div');
-                        qrDiv.classList.add('qrcode-overlay');
-                        var qrImg = document.createElement('img');
-                        qrImg.src = slide.qrcode;
-                        qrImg.alt = 'Scan for more information';
-                        qrDiv.appendChild(qrImg);
-                        // Set visibility based on current enableQrCodes setting
-                        qrDiv.style.display = enableQrCodes ? 'block' : 'none';
-                        slideEl.appendChild(qrDiv);
-                    }
-                    
-                    carousel.appendChild(slideEl);
-                    slideEls.push(slideEl);
-                });
-                
-                // Reset index if out of bounds
-                if (idx >= slideEls.length) idx = 0;
-                slideEls.forEach(function(slide, i) {
-                    slide.className = 'slide' + (i === idx ? ' active' : '');
-                });
-                startCarousel();
-            }
-
-            function fetchContent() {
-                fetch(<?php echo wp_json_encode(esc_url_raw(rest_url('dsp/v1/slides'))); ?>)
-                    .then(function(res) { return res.json(); })
-                    .then(function(data) {
-                        renderSlides(data);
-                    })
-                    .catch(function() {
-                        if (loading) loading.textContent = <?php echo wp_json_encode(__('Failed to load content.', 'digital-signage')); ?>;
-                    });
-            }
-
-            fetchContent();
-            setInterval(fetchContent, refreshInterval);
-        })();
-        </script>
+        <?php wp_footer(); ?>
     </body>
     </html>
     <?php
