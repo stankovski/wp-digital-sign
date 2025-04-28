@@ -22,6 +22,9 @@ body {
 .digsign-layout-main {
     flex: 6;
     overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 .digsign-layout-sidebar {
@@ -35,28 +38,40 @@ body {
 .digsign-layout-header {
     width: 100%;
     background-color: #f8f8f8;
-    padding: 10px 15px;
+    padding: 0px;
     box-sizing: border-box;
-    border-bottom: 1px solid #ddd;
-    overflow: auto;
+    border-bottom: 0px solid #ddd;
+    overflow: visible;
+    display: flex;
+    flex-direction: column;
 }
 
 /* Fullscreen layout */
 .digsign-layout-fullscreen .digsign-layout-main {
     flex: 1;
+    width: 100vw;
 }
 
 .digsign-layout-fullscreen .digsign-layout-container {
+    height: 100vh;
+    width: 100vw;
+}
+
+.digsign-layout-fullscreen .gallery {
+    width: 100vw;
     height: 100vh;
 }
 
 /* Header and 2 panels layout */
 .digsign-layout-header-panels .digsign-layout-header {
-    height: 15vh;
+    height: auto;
+    min-height: 15vh;
+    max-height: fit-content; /* Added to ensure header fits content */
 }
 
 .digsign-layout-header-panels .digsign-layout-container {
-    height: 85vh;
+    height: calc(100vh - 15vh);
+    min-height: 85vh;
 }
 
 /* 2 panels without header layout */
@@ -72,12 +87,12 @@ body {
 
 .gallery {
     display: flex;
-    gap: 20px;
     justify-content: center;
     align-items: center;
-    min-height: 940px;
     margin: 0;
     padding: 0;
+    width: 100%;
+    height: 100%;
 }
 
 .gallery .slide {
@@ -134,4 +149,48 @@ body {
     width: 100%;
     height: 100%;
     object-fit: contain;
+}
+
+/* Ensure header content is properly styled */
+.digsign-layout-header p:first-child {
+    margin-top: 0;
+}
+
+.digsign-layout-header p:last-child {
+    margin-bottom: 0;
+}
+
+/* Style for right panel content */
+.digsign-layout-sidebar p:first-child {
+    margin-top: 0;
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 1024px) {
+    .digsign-layout-container {
+        flex-direction: column;
+    }
+    
+    .digsign-layout-main, 
+    .digsign-layout-sidebar {
+        width: 100%;
+        flex: none;
+    }
+    
+    .digsign-layout-sidebar {
+        height: auto;
+        max-height: 30vh;
+        border-left: none;
+        border-top: 1px solid #ddd;
+    }
+    
+    .digsign-layout-header-panels .digsign-layout-container,
+    .digsign-layout-two-panels .digsign-layout-container {
+        height: auto;
+    }
+    
+    .gallery .slide {
+        width: 100% !important;
+        height: auto !important;
+    }
 }

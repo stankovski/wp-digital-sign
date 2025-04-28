@@ -84,9 +84,37 @@ function digsign_admin_scripts($hook) {
     wp_enqueue_style('digsign-admin-style', plugin_dir_url(__FILE__) . 'assets/css/digsign-admin.css', array(), '1.0.0');
     
     // Enqueue WordPress editor components
-    wp_enqueue_editor();
+    // Enqueue Gutenberg block editor assets
+    wp_enqueue_script('wp-blocks');
+    wp_enqueue_script('wp-element');
+    wp_enqueue_script('wp-editor');
+    wp_enqueue_script('wp-components');
+    wp_enqueue_script('wp-i18n');
+    wp_enqueue_script('wp-block-editor');
+    wp_enqueue_script('wp-block-library');
+    wp_enqueue_script('wp-format-library');
+    wp_enqueue_style('wp-edit-blocks');
+    wp_enqueue_style('wp-components');
+    wp_enqueue_style('wp-block-library');
+    wp_enqueue_style('wp-format-library');
     
-    wp_register_script('digsign-admin-script', '', array('jquery', 'wp-editor', 'wp-element', 'wp-blocks', 'wp-components'), '1.0', true);
+    // Register custom admin script with path to the actual file
+    wp_register_script(
+        'digsign-admin-script', 
+        plugin_dir_url(__FILE__) . 'assets/js/digsign-admin.js', 
+        array(
+            'jquery', 
+            'wp-editor', 
+            'wp-element', 
+            'wp-blocks', 
+            'wp-components', 
+            'wp-block-editor',
+            'wp-i18n',
+            'wp-block-library'
+        ), 
+        '1.0.1', 
+        true
+    );
     wp_enqueue_script('digsign-admin-script');
     
     wp_localize_script('digsign-admin-script', 'digsign_admin', array(
@@ -163,6 +191,25 @@ function digsign_admin_scripts($hook) {
     ";
     
     wp_add_inline_script('digsign-admin-script', $script);
+    
+    // Register the block library explicitly
+    if (function_exists('register_block_type')) {
+        wp_enqueue_script('wp-block-library');
+    }
+    
+    // Localize the script with additional data
+    wp_localize_script('digsign-admin-script', 'digsignGutenberg', array(
+        'ajaxurl' => admin_url('admin-ajax.php'),
+        'nonce' => wp_create_nonce('digsign-gutenberg-nonce'),
+        'media' => array(
+            'title' => __('Select or Upload Media', 'digital-signage'),
+            'button' => __('Use this media', 'digital-signage')
+        ),
+        'blockTypes' => function_exists('get_block_categories') ? get_block_categories(get_current_screen()) : array()
+    ));
+    
+    // Enqueue the admin script
+    wp_enqueue_script('digsign-admin-script');
 }
 
 // AJAX handler for thumbnail cleanup
@@ -271,6 +318,11 @@ function digsign_render_settings_page() {
     $selected_category = get_option('digsign_category_name', 'news');
     $site_url = esc_url(home_url('/digital-signage/'));
     $has_plain_permalinks = digsign_has_plain_permalinks();
+    
+    // Get saved content
+    $header_content = get_option('digsign_header_content', '');
+    $right_panel_content = get_option('digsign_right_panel_content', '');
+    
     ?>
     <div class="wrap">
         <h1>Digital Signage Settings</h1>
@@ -293,7 +345,7 @@ function digsign_render_settings_page() {
             <p><?php esc_html_e('This ensures the digital signage displays will always show fresh content according to your refresh settings.', 'digital-signage'); ?></p>
         </div>
         
-        <form method="post" action="options.php">
+        <form method="post" action="options.php" id="digsign-settings-form">
             <?php settings_fields('digsign_settings_group'); ?>
             <?php do_settings_sections('digsign_settings_group'); ?>
             <table class="form-table">
@@ -396,19 +448,22 @@ function digsign_render_settings_page() {
                     <div id="digsign-header-editor" style="<?php echo (get_option('digsign_layout_type', 'fullscreen') !== 'header-panels') ? 'display: none;' : ''; ?>">
                         <div class="digsign-editor-container">
                             <div class="digsign-editor-header">Header Content</div>
+                            <p class="description"><?php esc_html_e('Use this block editor to create content that will be displayed in the header area of the digital signage. You can add text, images, and other media.', 'digital-signage'); ?></p>
                             <div class="digsign-editor-body">
-                                <?php
-                                $header_content = get_option('digsign_header_content', '');
-                                wp_editor(
-                                    $header_content,
-                                    'digsign_header_content',
-                                    array(
-                                        'media_buttons' => true,
-                                        'textarea_rows' => 10,
-                                        'teeny'         => false,
-                                    )
-                                );
-                                ?>
+                                <div id="digsign-header-block-editor" class="block-editor-container"></div>
+                                <textarea 
+                                    id="digsign_header_content" 
+                                    name="digsign_header_content" 
+                                    class="digsign-gutenberg-content"
+                                    style="display:none;"
+                                ><?php echo esc_textarea($header_content); ?></textarea>
+                                <script>
+                                wp.domReady(function() {
+                                    setTimeout(function() {
+                                        initBlockEditor('digsign-header-block-editor', 'digsign_header_content');
+                                    }, 300);
+                                });
+                                </script>
                             </div>
                         </div>
                     </div>
@@ -417,19 +472,22 @@ function digsign_render_settings_page() {
                     <div id="digsign-right-panel-editor" style="<?php echo (get_option('digsign_layout_type', 'fullscreen') === 'fullscreen') ? 'display: none;' : ''; ?>">
                         <div class="digsign-editor-container">
                             <div class="digsign-editor-header">Right Panel Content</div>
+                            <p class="description"><?php esc_html_e('Use this block editor to create content that will be displayed in the right panel of the digital signage. You can add text, images, and other media.', 'digital-signage'); ?></p>
                             <div class="digsign-editor-body">
-                                <?php
-                                $right_panel_content = get_option('digsign_right_panel_content', '');
-                                wp_editor(
-                                    $right_panel_content,
-                                    'digsign_right_panel_content',
-                                    array(
-                                        'media_buttons' => true,
-                                        'textarea_rows' => 10,
-                                        'teeny'         => false,
-                                    )
-                                );
-                                ?>
+                                <div id="digsign-right-panel-block-editor" class="block-editor-container"></div>
+                                <textarea 
+                                    id="digsign_right_panel_content" 
+                                    name="digsign_right_panel_content" 
+                                    class="digsign-gutenberg-content"
+                                    style="display:none;"
+                                ><?php echo esc_textarea($right_panel_content); ?></textarea>
+                                <script>
+                                wp.domReady(function() {
+                                    setTimeout(function() {
+                                        initBlockEditor('digsign-right-panel-block-editor', 'digsign_right_panel_content');
+                                    }, 300);
+                                });
+                                </script>
                             </div>
                         </div>
                     </div>

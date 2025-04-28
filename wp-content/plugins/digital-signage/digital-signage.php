@@ -244,6 +244,9 @@ function digsign_render_gallery_page() {
     $refresh_interval = intval(get_option('digsign_refresh_interval', 10));
     $slide_delay = intval(get_option('digsign_slide_delay', 5));
     $enable_qrcodes = (bool)get_option('digsign_enable_qrcodes', true);
+    $layout_type = get_option('digsign_layout_type', 'fullscreen');
+    $header_content = get_option('digsign_header_content', '');
+    $right_panel_content = get_option('digsign_right_panel_content', '');
     
     // Enqueue required styles and scripts
     wp_enqueue_style('digsign-gallery-style');
@@ -258,7 +261,11 @@ function digsign_render_gallery_page() {
         .gallery .html-content {
             max-height: %dpx;
         }
-    ', $width, $height, $height - 40));
+        .digsign-layout-main {
+            width: %dpx;
+            max-width: %dpx;
+        }
+    ', $width, $height, $height - 40, $width, $width));
     
     // Add inline script for dynamic values
     wp_add_inline_script('digsign-gallery-script', sprintf('
@@ -268,6 +275,7 @@ function digsign_render_gallery_page() {
             slideDelay: %d,
             enableQrCodes: %s,
             categoryName: %s,
+            layoutType: %s,
             i18n: {
                 noContent: %s,
                 failedToLoad: %s
@@ -279,6 +287,7 @@ function digsign_render_gallery_page() {
         max(1, $slide_delay) * 1000,
         $enable_qrcodes ? 'true' : 'false',
         wp_json_encode($category_name),
+        wp_json_encode($layout_type),
         wp_json_encode(sprintf(__('No content found for category "%s".', 'digital-signage'), $category_name)),
         wp_json_encode(__('Failed to load content.', 'digital-signage'))
     ));
@@ -290,11 +299,25 @@ function digsign_render_gallery_page() {
         <title>Digital Signage</title>
         <?php wp_head(); ?>
     </head>
-    <body>
-        <div class="main-content">
-            <div class="gallery" id="digsign-carousel">
-                <p id="digsign-loading">Loading content...</p>
+    <body class="digsign-layout-<?php echo esc_attr($layout_type); ?>">
+        <?php if ($layout_type === 'header-panels' && !empty($header_content)): ?>
+        <div class="digsign-layout-header">
+            <?php echo wp_kses_post(apply_filters('the_content', $header_content)); ?>
+        </div>
+        <?php endif; ?>
+        
+        <div class="digsign-layout-container">
+            <div class="digsign-layout-main">
+                <div class="gallery" id="digsign-carousel">
+                    <p id="digsign-loading">Loading content...</p>
+                </div>
             </div>
+            
+            <?php if (($layout_type === 'header-panels' || $layout_type === 'two-panels') && !empty($right_panel_content)): ?>
+            <div class="digsign-layout-sidebar">
+                <?php echo wp_kses_post(apply_filters('the_content', $right_panel_content)); ?>
+            </div>
+            <?php endif; ?>
         </div>
         <?php wp_footer(); ?>
     </body>

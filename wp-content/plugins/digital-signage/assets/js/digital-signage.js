@@ -31,6 +31,14 @@
             if (data.settings.hasOwnProperty('enable_qrcodes')) {
                 digsignConfig.enableQrCodes = data.settings.enable_qrcodes;
             }
+            if (data.settings.hasOwnProperty('layout_type')) {
+                // Update layout class if changed from server
+                if (digsignConfig.layoutType !== data.settings.layout_type) {
+                    document.body.classList.remove('digsign-layout-' + digsignConfig.layoutType);
+                    document.body.classList.add('digsign-layout-' + data.settings.layout_type);
+                    digsignConfig.layoutType = data.settings.layout_type;
+                }
+            }
         }
         
         // Get slides from response
