@@ -34,6 +34,23 @@ function digsign_register_settings() {
         'default' => true,
         'sanitize_callback' => 'rest_sanitize_boolean'
     ]);
+    
+    // Layout settings
+    register_setting('digsign_settings_group', 'digsign_layout_type', [
+        'type' => 'string',
+        'default' => 'fullscreen',
+        'sanitize_callback' => 'sanitize_text_field'
+    ]);
+    register_setting('digsign_settings_group', 'digsign_right_panel_content', [
+        'type' => 'string',
+        'default' => '',
+        'sanitize_callback' => 'wp_kses_post'
+    ]);
+    register_setting('digsign_settings_group', 'digsign_header_content', [
+        'type' => 'string',
+        'default' => '',
+        'sanitize_callback' => 'wp_kses_post'
+    ]);
 }
 
 // Add settings page
@@ -63,7 +80,13 @@ function digsign_admin_scripts($hook) {
         return;
     }
     
-    wp_register_script('digsign-admin-script', '', array('jquery'), '1.0', true);
+    // Enqueue admin styles
+    wp_enqueue_style('digsign-admin-style', plugin_dir_url(__FILE__) . 'assets/css/digsign-admin.css', array(), '1.0.0');
+    
+    // Enqueue WordPress editor components
+    wp_enqueue_editor();
+    
+    wp_register_script('digsign-admin-script', '', array('jquery', 'wp-editor', 'wp-element', 'wp-blocks', 'wp-components'), '1.0', true);
     wp_enqueue_script('digsign-admin-script');
     
     wp_localize_script('digsign-admin-script', 'digsign_admin', array(
@@ -76,6 +99,7 @@ function digsign_admin_scripts($hook) {
     // Add inline script
     $script = "
         jQuery(document).ready(function($) {
+            // Thumbnails cleanup
             $('#digsign-cleanup-button').on('click', function(e) {
                 e.preventDefault();
                 
@@ -101,6 +125,40 @@ function digsign_admin_scripts($hook) {
                     }
                 });
             });
+            
+            // Layout accordion toggle
+            $('.digsign-layout-accordion-header').on('click', function() {
+                $(this).parent().toggleClass('digsign-layout-accordion-open');
+            });
+            
+            // Layout preview update
+            $('#digsign_layout_type').on('change', function() {
+                var selectedLayout = $(this).val();
+                $('.layout-preview-svg').hide();
+                $('#layout-preview-' + selectedLayout).show();
+                
+                // Toggle editor visibility based on layout
+                toggleEditors(selectedLayout);
+            });
+            
+            function toggleEditors(layoutType) {
+                var rightPanelEditor = $('#digsign-right-panel-editor');
+                var headerEditor = $('#digsign-header-editor');
+                
+                if (layoutType === 'header-panels') {
+                    rightPanelEditor.show();
+                    headerEditor.show();
+                } else if (layoutType === 'two-panels') {
+                    rightPanelEditor.show();
+                    headerEditor.hide();
+                } else {
+                    rightPanelEditor.hide();
+                    headerEditor.hide();
+                }
+            }
+            
+            // Initialize editors visibility
+            toggleEditors($('#digsign_layout_type').val());
         });
     ";
     
@@ -291,6 +349,93 @@ function digsign_render_settings_page() {
                     </td>
                 </tr>
             </table>
+            <!-- Layout Settings Accordion -->
+            <div class="digsign-layout-accordion">
+                <div class="digsign-layout-accordion-header">
+                    <h3>Layout Settings</h3>
+                    <span class="digsign-layout-accordion-icon dashicons dashicons-arrow-down-alt2"></span>
+                </div>
+                <div class="digsign-layout-accordion-content">
+                    <table class="form-table">
+                        <tr valign="top">
+                            <th scope="row">Display Layout</th>
+                            <td>
+                                <div class="digsign-layout-option">
+                                    <select name="digsign_layout_type" id="digsign_layout_type">
+                                        <option value="fullscreen" <?php selected(get_option('digsign_layout_type', 'fullscreen'), 'fullscreen'); ?>>Full Screen</option>
+                                        <option value="header-panels" <?php selected(get_option('digsign_layout_type', 'fullscreen'), 'header-panels'); ?>>Header and 2 Panels (60/40)</option>
+                                        <option value="two-panels" <?php selected(get_option('digsign_layout_type', 'fullscreen'), 'two-panels'); ?>>2 Panels without Header (60/40)</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="digsign-layout-preview">
+                                    <p>Layout Preview:</p>
+                                    <img class="layout-preview-svg" id="layout-preview-fullscreen" 
+                                         src="<?php echo esc_url(plugin_dir_url(__FILE__) . 'assets/images/layout-fullscreen.svg'); ?>" 
+                                         alt="Full Screen Layout" 
+                                         width="100" height="50"
+                                         <?php echo (get_option('digsign_layout_type', 'fullscreen') !== 'fullscreen') ? 'style="display: none;"' : ''; ?>>
+                                    
+                                    <img class="layout-preview-svg" id="layout-preview-header-panels" 
+                                         src="<?php echo esc_url(plugin_dir_url(__FILE__) . 'assets/images/layout-header-panels.svg'); ?>" 
+                                         alt="Header and 2 Panels Layout" 
+                                         width="100" height="50"
+                                         <?php echo (get_option('digsign_layout_type', 'fullscreen') !== 'header-panels') ? 'style="display: none;"' : ''; ?>>
+                                    
+                                    <img class="layout-preview-svg" id="layout-preview-two-panels" 
+                                         src="<?php echo esc_url(plugin_dir_url(__FILE__) . 'assets/images/layout-two-panels.svg'); ?>" 
+                                         alt="2 Panels Layout" 
+                                         width="100" height="50"
+                                         <?php echo (get_option('digsign_layout_type', 'fullscreen') !== 'two-panels') ? 'style="display: none;"' : ''; ?>>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                    
+                    <!-- Gutenberg Editor for Header Content (Layout 2) -->
+                    <div id="digsign-header-editor" style="<?php echo (get_option('digsign_layout_type', 'fullscreen') !== 'header-panels') ? 'display: none;' : ''; ?>">
+                        <div class="digsign-editor-container">
+                            <div class="digsign-editor-header">Header Content</div>
+                            <div class="digsign-editor-body">
+                                <?php
+                                $header_content = get_option('digsign_header_content', '');
+                                wp_editor(
+                                    $header_content,
+                                    'digsign_header_content',
+                                    array(
+                                        'media_buttons' => true,
+                                        'textarea_rows' => 10,
+                                        'teeny'         => false,
+                                    )
+                                );
+                                ?>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Gutenberg Editor for Right Panel Content (Layout 2 and 3) -->
+                    <div id="digsign-right-panel-editor" style="<?php echo (get_option('digsign_layout_type', 'fullscreen') === 'fullscreen') ? 'display: none;' : ''; ?>">
+                        <div class="digsign-editor-container">
+                            <div class="digsign-editor-header">Right Panel Content</div>
+                            <div class="digsign-editor-body">
+                                <?php
+                                $right_panel_content = get_option('digsign_right_panel_content', '');
+                                wp_editor(
+                                    $right_panel_content,
+                                    'digsign_right_panel_content',
+                                    array(
+                                        'media_buttons' => true,
+                                        'textarea_rows' => 10,
+                                        'teeny'         => false,
+                                    )
+                                );
+                                ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <?php submit_button(); ?>
         </form>
         

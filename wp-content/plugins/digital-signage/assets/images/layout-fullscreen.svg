@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="50" viewBox="0 0 100 50">
+  <!-- Border -->
+  <rect x="1" y="1" width="98" height="48" rx="2" ry="2" fill="white" stroke="black" stroke-width="1"/>
+  
+  <!-- Main content area - full screen -->
+  <rect x="4" y="4" width="92" height="42" fill="black" fill-opacity="0.1"/>
+  
+  <!-- Some basic content representation -->
+  <rect x="10" y="8" width="80" height="12" fill="black" fill-opacity="0.3"/>
+  <rect x="10" y="24" width="80" height="4" fill="black" fill-opacity="0.2"/>
+  <rect x="10" y="32" width="80" height="4" fill="black" fill-opacity="0.2"/>
+  <rect x="10" y="40" width="50" height="4" fill="black" fill-opacity="0.2"/>
+</svg>

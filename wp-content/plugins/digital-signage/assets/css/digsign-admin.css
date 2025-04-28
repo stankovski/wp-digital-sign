@@ -1,0 +1,192 @@
+.digsign-layout-accordion {
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+
+.digsign-layout-accordion-header {
+    background-color: #f8f9fa;
+    padding: 10px 15px;
+    border-bottom: 1px solid #ccd0d4;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.digsign-layout-accordion-header h3 {
+    margin: 0;
+}
+
+.digsign-layout-accordion-icon {
+    transition: transform 0.3s;
+}
+
+.digsign-layout-accordion-content {
+    padding: 15px;
+    display: none;
+}
+
+.digsign-layout-accordion-open .digsign-layout-accordion-content {
+    display: block;
+}
+
+.digsign-layout-accordion-open .digsign-layout-accordion-icon {
+    transform: rotate(180deg);
+}
+
+.digsign-layout-preview {
+    display: flex;
+    align-items: center;
+    margin-top: 10px;
+}
+
+.digsign-layout-preview img {
+    width: 100px;
+    height: 50px;
+    margin-left: 15px;
+    border: 1px solid #ccd0d4;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.digsign-layout-option {
+    margin-bottom: 15px;
+}
+
+.digsign-editor-container {
+    margin-top: 20px;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+}
+
+.digsign-editor-header {
+    background-color: #f8f9fa;
+    padding: 8px 12px;
+    border-bottom: 1px solid #ccd0d4;
+    font-weight: bold;
+}
+
+/* Layout styles for the signage display */
+.digsign-layout-header {
+    width: 100%;
+    background-color: #f8f8f8;
+    padding: 10px;
+    box-sizing: border-box;
+    border-bottom: 1px solid #ddd;
+}
+
+.digsign-layout-container {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+    box-sizing: border-box;
+}
+
+.digsign-layout-main {
+    flex: 6;
+    overflow: hidden;
+}
+
+.digsign-layout-sidebar {
+    flex: 4;
+    overflow: auto;
+    padding: 15px;
+    background-color: #f8f8f8;
+    border-left: 1px solid #ddd;
+}
+
+/* Fullscreen layout */
+.digsign-layout-fullscreen .gallery {
+    width: 100vw;
+    height: 100vh;
+}
+
+/* Header and 2 panels layout */
+.digsign-layout-header-panels .digsign-layout-header {
+    height: 15vh;
+    overflow: auto;
+}
+
+.digsign-layout-header-panels .digsign-layout-container {
+    height: 85vh;
+}
+
+/* 2 panels without header layout */
+.digsign-layout-two-panels .digsign-layout-container {
+    height: 100vh;
+}
+
+/* Gutenberg Block Editor styles */
+.block-editor-container {
+    border: 1px solid #ddd;
+    border-radius: 2px;
+    min-height: 300px;
+    position: relative;
+    background: white;
+    margin-bottom: 20px;
+    padding: 0;
+    clear: both;
+}
+
+.block-editor-container .block-editor-block-list__layout {
+    padding: 16px;
+}
+
+/* Fix editor visibility issues */
+.block-editor-block-list__layout {
+    min-height: 200px;
+}
+
+/* Ensure editor fills its container */
+.editor-styles-wrapper {
+    height: 100%;
+    width: 100%;
+}
+
+/* Fix block toolbar positioning */
+.block-editor-block-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 99;
+    background: white;
+}
+
+/* Custom toolbar styling */
+.block-editor-container .components-toolbar {
+    border: 1px solid #e2e4e7;
+    background-color: #fff;
+}
+
+/* Make block outlines visible but subtle */
+.block-editor-container .block-editor-block-list__block {
+    position: relative;
+}
+
+.block-editor-container .block-editor-block-list__block.is-selected {
+    outline: 1px solid #1e88e5;
+}
+
+/* Adjust padding for editor blocks */
+.block-editor-container .block-editor-block-list__block {
+    margin-top: 0;
+    margin-bottom: 28px;
+    padding: 0;
+}
+
+/* Better block appender styling */
+.block-editor-container .block-editor-default-block-appender {
+    clear: both;
+}
+
+/* Add some additional debugging help */
+.editor-initialization-error {
+    color: #d63638;
+    padding: 10px;
+    border-left: 4px solid #d63638;
+    background: #f8d7da;
+}
+
+/* Adjust spacing in editor */
+.digsign-editor-body {
+    padding: 10px;
+}

@@ -162,6 +162,7 @@ add_action('rest_api_init', function () {
             $refresh_interval = intval(get_option('digsign_refresh_interval', 10));
             $slide_delay = intval(get_option('digsign_slide_delay', 5));
             $enable_qrcodes = (bool)get_option('digsign_enable_qrcodes', true);
+            $layout_type = get_option('digsign_layout_type', 'fullscreen');
             
             $args = [
                 'category_name' => $category_name,
@@ -219,12 +220,15 @@ add_action('rest_api_init', function () {
                 }
                 wp_reset_postdata();
             }
+            $layout_type = get_option('digsign_layout_type', 'fullscreen');
+            
             return rest_ensure_response([
                 'slides' => $slides,
                 'settings' => [
                     'refresh_interval' => $refresh_interval,
                     'slide_delay' => $slide_delay,
-                    'enable_qrcodes' => $enable_qrcodes
+                    'enable_qrcodes' => $enable_qrcodes,
+                    'layout_type' => $layout_type
                 ]
             ]);
         },

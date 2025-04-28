@@ -11,6 +11,59 @@ body {
     padding: 0;
 }
 
+/* Layout styles */
+.digsign-layout-container {
+    display: flex;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+.digsign-layout-main {
+    flex: 6;
+    overflow: hidden;
+}
+
+.digsign-layout-sidebar {
+    flex: 4;
+    overflow: auto;
+    padding: 15px;
+    background-color: #f8f8f8;
+    border-left: 1px solid #ddd;
+}
+
+.digsign-layout-header {
+    width: 100%;
+    background-color: #f8f8f8;
+    padding: 10px 15px;
+    box-sizing: border-box;
+    border-bottom: 1px solid #ddd;
+    overflow: auto;
+}
+
+/* Fullscreen layout */
+.digsign-layout-fullscreen .digsign-layout-main {
+    flex: 1;
+}
+
+.digsign-layout-fullscreen .digsign-layout-container {
+    height: 100vh;
+}
+
+/* Header and 2 panels layout */
+.digsign-layout-header-panels .digsign-layout-header {
+    height: 15vh;
+}
+
+.digsign-layout-header-panels .digsign-layout-container {
+    height: 85vh;
+}
+
+/* 2 panels without header layout */
+.digsign-layout-two-panels .digsign-layout-container {
+    height: 100vh;
+}
+
 .main-content {
     margin: 0;
     padding: 0;

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="50" viewBox="0 0 100 50">
+  <!-- Border -->
+  <rect x="1" y="1" width="98" height="48" rx="2" ry="2" fill="white" stroke="black" stroke-width="1"/>
+  
+  <!-- Header area -->
+  <rect x="1" y="1" width="98" height="10" fill="black" fill-opacity="0.15"/>
+  <rect x="5" y="3" width="50" height="5" fill="black" fill-opacity="0.3"/>
+  
+  <!-- Main content area - 60% -->
+  <rect x="1" y="11" width="60" height="38" fill="black" fill-opacity="0.1"/>
+  
+  <!-- Content representation in main area -->
+  <rect x="5" y="15" width="50" height="8" fill="black" fill-opacity="0.3"/>
+  <rect x="5" y="26" width="50" height="3" fill="black" fill-opacity="0.2"/>
+  <rect x="5" y="32" width="50" height="3" fill="black" fill-opacity="0.2"/>
+  <rect x="5" y="38" width="30" height="3" fill="black" fill-opacity="0.2"/>
+  
+  <!-- Right panel - 40% -->
+  <rect x="61" y="11" width="38" height="38" fill="black" fill-opacity="0.2"/>
+  
+  <!-- Content in right panel -->
+  <rect x="65" y="15" width="30" height="10" fill="black" fill-opacity="0.3"/>
+  <rect x="65" y="30" width="30" height="3" fill="black" fill-opacity="0.3"/>
+  <rect x="65" y="36" width="30" height="3" fill="black" fill-opacity="0.3"/>
+</svg>
