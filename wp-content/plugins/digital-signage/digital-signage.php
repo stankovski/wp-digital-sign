@@ -236,6 +236,55 @@ add_action('rest_api_init', function () {
     ]);
 });
 
+// Legacy REST API endpoint for gallery images
+add_action('rest_api_init', function () {
+    register_rest_route('dsp/v1', '/images', [
+        'methods' => 'GET',
+        'callback' => function () {
+            $category_name = get_option('dsp_category_name', 'news');
+            $width = intval(get_option('dsp_image_width', 1260));
+            $height = intval(get_option('dsp_image_height', 940));
+            $image_size = 'dsp-gallery-thumb';
+            $args = [
+                'category_name' => $category_name,
+                'posts_per_page' => -1,
+                'post_status' => 'publish',
+            ];
+            $query = new WP_Query($args);
+            $images = [];
+            if ($query->have_posts()) {
+                while ($query->have_posts()) {
+                    $query->the_post();
+                    $post_id = get_the_ID();
+                    $thumb_id = get_post_thumbnail_id($post_id);
+                    if ($thumb_id) {
+                        // Check if the custom size exists, generate if not
+                        $meta = wp_get_attachment_metadata($thumb_id);
+                        if (!isset($meta['sizes'][$image_size])) {
+                            // Generate the image size on demand
+                            require_once ABSPATH . 'wp-admin/includes/image.php';
+                            $fullsizepath = get_attached_file($thumb_id);
+                            if ($fullsizepath && file_exists($fullsizepath)) {
+                                $metadata = wp_generate_attachment_metadata($thumb_id, $fullsizepath);
+                                if ($metadata && !is_wp_error($metadata)) {
+                                    wp_update_attachment_metadata($thumb_id, $metadata);
+                                }
+                            }
+                        }
+                        $img_url = get_the_post_thumbnail_url($post_id, $image_size);
+                        if ($img_url) {
+                            $images[] = $img_url;
+                        }
+                    }
+                }
+                wp_reset_postdata();
+            }
+            return rest_ensure_response($images);
+        },
+        'permission_callback' => '__return_true'
+    ]);
+});
+
 // Render gallery HTML
 function digsign_render_gallery_page() {
     $width = intval(get_option('digsign_image_width', 1260));
