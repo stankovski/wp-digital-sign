@@ -16,20 +16,24 @@ if (!defined('ABSPATH')) exit;
 // Include QR code generator
 require_once plugin_dir_path(__FILE__) . 'qrcode.php';
 
-// Define QR code directory
-define('DIGSIGN_QRCODE_DIR', WP_CONTENT_DIR . '/uploads/digsign-qrcodes/');
-define('DIGSIGN_QRCODE_URL', content_url('/uploads/digsign-qrcodes/'));
+// Define QR code directory using wp_upload_dir()
+function digsign_get_upload_dir() {
+    $upload_dir = wp_upload_dir();
+    return [
+        'dir' => trailingslashit($upload_dir['basedir']) . 'digsign-qrcodes/',
+        'url' => trailingslashit($upload_dir['baseurl']) . 'digsign-qrcodes/',
+    ];
+}
+
+// Get QR code directory paths when needed
+define('DIGSIGN_QRCODE_DIR', digsign_get_upload_dir()['dir']);
+define('DIGSIGN_QRCODE_URL', digsign_get_upload_dir()['url']);
 
 // Create QR code directory if it doesn't exist
 function digsign_create_qrcode_dir() {
-    if (!file_exists(DIGSIGN_QRCODE_DIR)) {
-        wp_mkdir_p(DIGSIGN_QRCODE_DIR);
-        // Create .htaccess to allow direct access to QR code images
-        $htaccess = "# Allow direct access to QR code images\n";
-        $htaccess .= "<IfModule mod_rewrite.c>\n";
-        $htaccess .= "RewriteEngine Off\n";
-        $htaccess .= "</IfModule>\n";
-        file_put_contents(DIGSIGN_QRCODE_DIR . '.htaccess', $htaccess);
+    $upload_info = digsign_get_upload_dir();
+    if (!file_exists($upload_info['dir'])) {
+        wp_mkdir_p($upload_info['dir']);
     }
 }
 register_activation_hook(__FILE__, 'digsign_create_qrcode_dir');
@@ -38,8 +42,9 @@ register_activation_hook(__FILE__, 'digsign_create_qrcode_dir');
 function digsign_generate_qrcode($post_id) {
     $post_url = get_permalink($post_id);
     $filename = 'qr-' . md5($post_url) . '.png';
-    $file_path = DIGSIGN_QRCODE_DIR . $filename;
-    $file_url = DIGSIGN_QRCODE_URL . $filename;
+    $upload_info = digsign_get_upload_dir();
+    $file_path = $upload_info['dir'] . $filename;
+    $file_url = $upload_info['url'] . $filename;
     
     // Check if QR code exists already
     if (!file_exists($file_path)) {
@@ -160,7 +165,7 @@ add_action('rest_api_init', function () {
             $height = intval(get_option('digsign_image_height', 940));
             $image_size = 'digsign-gallery-thumb';
             $refresh_interval = intval(get_option('digsign_refresh_interval', 10));
-            $slide_delay = intval(get_option('digsign_slide_delay', 5));
+            $slide_delay = absint(get_option('digsign_slide_delay', 5));
             $enable_qrcodes = (bool)get_option('digsign_enable_qrcodes', true);
             $layout_type = get_option('digsign_layout_type', 'fullscreen');
             
@@ -291,11 +296,18 @@ function digsign_render_gallery_page() {
     $height = intval(get_option('digsign_image_height', 940));
     $category_name = esc_html(get_option('digsign_category_name', 'news'));
     $refresh_interval = intval(get_option('digsign_refresh_interval', 10));
-    $slide_delay = intval(get_option('digsign_slide_delay', 5));
+    $slide_delay = absint(get_option('digsign_slide_delay', 5));
     $enable_qrcodes = (bool)get_option('digsign_enable_qrcodes', true);
     $layout_type = get_option('digsign_layout_type', 'fullscreen');
     $header_content = get_option('digsign_header_content', '');
-    $right_panel_content = get_option('digsign_right_panel_content', '');
+    $right_panel_post_id = intval(get_option('digsign_right_panel_content', 0));
+    $right_panel_content = '';
+    if ($right_panel_post_id) {
+        $post = get_post($right_panel_post_id);
+        if ($post && $post->post_status === 'publish') {
+            $right_panel_content = apply_filters('the_content', $post->post_content);
+        }
+    }
     
     // Enqueue required styles and scripts
     wp_enqueue_style('digsign-gallery-style');
@@ -332,8 +344,8 @@ function digsign_render_gallery_page() {
         };
     ', 
         wp_json_encode(esc_url_raw(rest_url('digsign/v1/slides'))),
-        max(1, $refresh_interval) * 1000,
-        max(1, $slide_delay) * 1000,
+        absint(max(1, $refresh_interval)) * 1000,
+        absint(max(1, $slide_delay)) * 1000,
         $enable_qrcodes ? 'true' : 'false',
         wp_json_encode($category_name),
         wp_json_encode($layout_type),
@@ -364,7 +376,7 @@ function digsign_render_gallery_page() {
             
             <?php if (($layout_type === 'header-panels' || $layout_type === 'two-panels') && !empty($right_panel_content)): ?>
             <div class="digsign-layout-sidebar">
-                <?php echo wp_kses_post(apply_filters('the_content', $right_panel_content)); ?>
+                <?php echo wp_kses_post($right_panel_content); ?>
             </div>
             <?php endif; ?>
         </div>

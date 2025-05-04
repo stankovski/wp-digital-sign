@@ -42,9 +42,9 @@ function digsign_register_settings() {
         'sanitize_callback' => 'sanitize_text_field'
     ]);
     register_setting('digsign_settings_group', 'digsign_right_panel_content', [
-        'type' => 'string',
-        'default' => '',
-        'sanitize_callback' => 'wp_kses_post'
+        'type' => 'integer',
+        'default' => 0,
+        'sanitize_callback' => 'absint'
     ]);
     register_setting('digsign_settings_group', 'digsign_header_content', [
         'type' => 'string',
@@ -274,8 +274,15 @@ function digsign_render_settings_page() {
     
     // Get saved content
     $header_content = get_option('digsign_header_content', '');
-    $right_panel_content = get_option('digsign_right_panel_content', '');
-    
+    $right_panel_post_id = intval(get_option('digsign_right_panel_content', 0));
+    // Fetch posts for right panel selection
+    $right_panel_posts = get_posts([
+        'post_type' => 'post',
+        'post_status' => 'publish',
+        'numberposts' => -1,
+        'orderby' => 'title',
+        'order' => 'ASC',
+    ]);
     ?>
     <div class="wrap">
         <h1>Digital Signage Settings</h1>
@@ -418,23 +425,20 @@ function digsign_render_settings_page() {
                         </div>
                     </div>
                     
-                    <!-- Gutenberg Editor for Right Panel Content (Layout 2 and 3) -->
+                    <!-- Right Panel Post Selector (Layout 2 and 3) -->
                     <div id="digsign-right-panel-editor" style="<?php echo (get_option('digsign_layout_type', 'fullscreen') === 'fullscreen') ? 'display: none;' : ''; ?>">
                         <div class="digsign-editor-container">
-                            <div class="digsign-editor-header">Right Panel Content</div>
+                            <div class="digsign-editor-header">Right Panel Post</div>
                             <div class="digsign-editor-body">
-                                <?php
-                                $right_panel_content = get_option('digsign_right_panel_content', '');
-                                wp_editor(
-                                    $right_panel_content,
-                                    'digsign_right_panel_content',
-                                    array(
-                                        'media_buttons' => true,
-                                        'textarea_rows' => 10,
-                                        'teeny'         => false,
-                                    )
-                                );
-                                ?>
+                                <select name="digsign_right_panel_content" id="digsign_right_panel_content">
+                                    <option value="0"<?php selected($right_panel_post_id, 0); ?>>-- None --</option>
+                                    <?php foreach ($right_panel_posts as $post): ?>
+                                        <option value="<?php echo esc_attr($post->ID); ?>"<?php selected($right_panel_post_id, $post->ID); ?>>
+                                            <?php echo esc_html($post->post_title); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <p class="description">Select a post to display in the right panel.</p>
                             </div>
                         </div>
                     </div>
