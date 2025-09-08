@@ -155,78 +155,105 @@ add_action('template_redirect', 'digsign_template_redirect');
 // --- Settings Page ---
 require_once plugin_dir_path(__FILE__) . 'settings.php';
 
+/**
+ * Collect media (slides or image URLs) for a given category.
+ * Options (array):
+ *  - category_name (string)
+ *  - image_size (string) image size name to request
+ *  - include_html (bool) whether to fallback to post HTML content when no featured image
+ *  - include_qr (bool) whether to generate QR codes for posts
+ *  - structure (string) 'slides' for detailed slide objects or 'urls' for simple list of image URLs
+ *
+ * @return array
+ */
+function digsign_collect_media($options = []) {
+    $defaults = [
+        'category_name' => 'news',
+        'image_size'    => 'digsign-gallery-thumb',
+        'include_html'  => true,
+        'include_qr'    => true,
+        'structure'     => 'slides', // 'slides' or 'urls'
+    ];
+    $opts = wp_parse_args($options, $defaults);
+
+    $args = [
+        'category_name'  => $opts['category_name'],
+        'posts_per_page' => -1,
+        'post_status'    => 'publish',
+    ];
+    $query = new WP_Query($args);
+    $results = [];
+
+    if ($query->have_posts()) {
+        while ($query->have_posts()) {
+            $query->the_post();
+            $post_id  = get_the_ID();
+            $thumb_id = get_post_thumbnail_id($post_id);
+            $qr_code_url = ($opts['include_qr']) ? digsign_generate_qrcode($post_id) : '';
+
+            if ($thumb_id) {
+                // Ensure target size exists
+                $meta = wp_get_attachment_metadata($thumb_id);
+                if (!isset($meta['sizes'][$opts['image_size']])) {
+                    require_once ABSPATH . 'wp-admin/includes/image.php';
+                    $fullsizepath = get_attached_file($thumb_id);
+                    if ($fullsizepath && file_exists($fullsizepath)) {
+                        $metadata = wp_generate_attachment_metadata($thumb_id, $fullsizepath);
+                        if ($metadata && !is_wp_error($metadata)) {
+                            wp_update_attachment_metadata($thumb_id, $metadata);
+                        }
+                    }
+                }
+                $img_url = get_the_post_thumbnail_url($post_id, $opts['image_size']);
+                if ($img_url) {
+                    if ($opts['structure'] === 'urls') {
+                        $results[] = $img_url; // simple list
+                    } else {
+                        $results[] = [
+                            'type'       => 'image',
+                            'content'    => $img_url,
+                            'qrcode'     => $qr_code_url,
+                            'post_title' => get_the_title(),
+                            'post_url'   => get_permalink($post_id),
+                        ];
+                    }
+                }
+            } elseif ($opts['include_html'] && $opts['structure'] !== 'urls') {
+                // Fallback to post content (only for slides structure)
+                $content = apply_filters('the_content', get_the_content());
+                if (!empty($content)) {
+                    $results[] = [
+                        'type'     => 'html',
+                        'content'  => $content,
+                        'title'    => get_the_title(),
+                        'qrcode'   => $qr_code_url,
+                        'post_url' => get_permalink($post_id),
+                    ];
+                }
+            }
+        }
+        wp_reset_postdata();
+    }
+    return $results;
+}
+
 // REST API endpoint for gallery images
 add_action('rest_api_init', function () {
     register_rest_route('digsign/v1', '/slides', [
         'methods' => 'GET',
         'callback' => function () {
-            $category_name = get_option('digsign_category_name', 'news');
-            $width = intval(get_option('digsign_image_width', 1260));
-            $height = intval(get_option('digsign_image_height', 940));
-            $image_size = 'digsign-gallery-thumb';
-            $refresh_interval = intval(get_option('digsign_refresh_interval', 10));
-            $slide_delay = absint(get_option('digsign_slide_delay', 5));
-            $enable_qrcodes = (bool)get_option('digsign_enable_qrcodes', true);
-            $layout_type = get_option('digsign_layout_type', 'fullscreen');
-            
-            $args = [
+            $category_name     = get_option('digsign_category_name', 'news');
+            $refresh_interval  = intval(get_option('digsign_refresh_interval', 10));
+            $slide_delay       = absint(get_option('digsign_slide_delay', 5));
+            $enable_qrcodes    = (bool)get_option('digsign_enable_qrcodes', true);
+            $layout_type       = get_option('digsign_layout_type', 'fullscreen');
+            $slides = digsign_collect_media([
                 'category_name' => $category_name,
-                'posts_per_page' => -1,
-                'post_status' => 'publish',
-            ];
-            $query = new WP_Query($args);
-            $slides = [];
-            if ($query->have_posts()) {
-                while ($query->have_posts()) {
-                    $query->the_post();
-                    $post_id = get_the_ID();
-                    $thumb_id = get_post_thumbnail_id($post_id);
-                    
-                    // Generate QR code only if enabled
-                    $qr_code_url = $enable_qrcodes ? digsign_generate_qrcode($post_id) : '';
-                    
-                    if ($thumb_id) {
-                        // Check if the custom size exists, generate if not
-                        $meta = wp_get_attachment_metadata($thumb_id);
-                        if (!isset($meta['sizes'][$image_size])) {
-                            // Generate the image size on demand
-                            require_once ABSPATH . 'wp-admin/includes/image.php';
-                            $fullsizepath = get_attached_file($thumb_id);
-                            if ($fullsizepath && file_exists($fullsizepath)) {
-                                $metadata = wp_generate_attachment_metadata($thumb_id, $fullsizepath);
-                                if ($metadata && !is_wp_error($metadata)) {
-                                    wp_update_attachment_metadata($thumb_id, $metadata);
-                                }
-                            }
-                        }
-                        $img_url = get_the_post_thumbnail_url($post_id, $image_size);
-                        if ($img_url) {
-                            $slides[] = [
-                                'type' => 'image',
-                                'content' => $img_url,
-                                'qrcode' => $qr_code_url,
-                                'post_title' => get_the_title(),
-                                'post_url' => get_permalink($post_id)
-                            ];
-                        }
-                    } else {
-                        // No featured image, use post content instead
-                        $content = apply_filters('the_content', get_the_content());
-                        if (!empty($content)) {
-                            $slides[] = [
-                                'type' => 'html',
-                                'content' => $content,
-                                'title' => get_the_title(),
-                                'qrcode' => $qr_code_url,
-                                'post_url' => get_permalink($post_id)
-                            ];
-                        }
-                    }
-                }
-                wp_reset_postdata();
-            }
-            $layout_type = get_option('digsign_layout_type', 'fullscreen');
-            
+                'image_size'    => 'digsign-gallery-thumb',
+                'include_html'  => true,
+                'include_qr'    => $enable_qrcodes,
+                'structure'     => 'slides'
+            ]);
             return rest_ensure_response([
                 'slides' => $slides,
                 'settings' => [
@@ -247,43 +274,14 @@ add_action('rest_api_init', function () {
         'methods' => 'GET',
         'callback' => function () {
             $category_name = get_option('dsp_category_name', 'news');
-            $width = intval(get_option('dsp_image_width', 1260));
-            $height = intval(get_option('dsp_image_height', 940));
-            $image_size = 'dsp-gallery-thumb';
-            $args = [
+            // Legacy endpoint only returns image URLs (no HTML, no QR codes)
+            $images = digsign_collect_media([
                 'category_name' => $category_name,
-                'posts_per_page' => -1,
-                'post_status' => 'publish',
-            ];
-            $query = new WP_Query($args);
-            $images = [];
-            if ($query->have_posts()) {
-                while ($query->have_posts()) {
-                    $query->the_post();
-                    $post_id = get_the_ID();
-                    $thumb_id = get_post_thumbnail_id($post_id);
-                    if ($thumb_id) {
-                        // Check if the custom size exists, generate if not
-                        $meta = wp_get_attachment_metadata($thumb_id);
-                        if (!isset($meta['sizes'][$image_size])) {
-                            // Generate the image size on demand
-                            require_once ABSPATH . 'wp-admin/includes/image.php';
-                            $fullsizepath = get_attached_file($thumb_id);
-                            if ($fullsizepath && file_exists($fullsizepath)) {
-                                $metadata = wp_generate_attachment_metadata($thumb_id, $fullsizepath);
-                                if ($metadata && !is_wp_error($metadata)) {
-                                    wp_update_attachment_metadata($thumb_id, $metadata);
-                                }
-                            }
-                        }
-                        $img_url = get_the_post_thumbnail_url($post_id, $image_size);
-                        if ($img_url) {
-                            $images[] = $img_url;
-                        }
-                    }
-                }
-                wp_reset_postdata();
-            }
+                'image_size'    => 'dsp-gallery-thumb',
+                'include_html'  => false,
+                'include_qr'    => false,
+                'structure'     => 'urls'
+            ]);
             return rest_ensure_response($images);
         },
         'permission_callback' => '__return_true'
