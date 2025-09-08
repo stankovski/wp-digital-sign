@@ -9,6 +9,9 @@ wp-content/plugins/advanced-import/*
 wp-content/plugins/create-block-theme/*
 wp-content/plugins/ezan_io/*
 wp-content/plugins/updraftplus/*
+wp-content/plugins/force-regenerate-thumbnails/*
+wp-content/plugins/performance-lab/*
+wp-content/plugins/webp-uploads/*
 wp-content/uploads/*
 wp-content/updraft/*
 **/vendor/**/*
