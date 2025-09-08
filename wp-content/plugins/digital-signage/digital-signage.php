@@ -2,7 +2,7 @@
 /*
 Plugin Name: Digital Signage
 Description: Adds a page that displays a digital signage gallery of images from your WordPress posts.
-Version: 1.0.1
+Version: 1.0.2
 Author: stankovski
 Author URI: https://github.com/stankovski/
 Text Domain: digital-signage
@@ -72,6 +72,76 @@ function digsign_generate_qrcode($post_id) {
     }
     
     return $file_url;
+}
+
+// Get image URL with modern format support (WebP, AVIF, etc.)
+function digsign_get_modern_image_url($post_id, $image_size) {
+    $thumb_id = get_post_thumbnail_id($post_id);
+    if (!$thumb_id) {
+        return false;
+    }
+    
+    // Check if webp-uploads plugin is active and modern formats should be used
+    $use_modern_formats = is_plugin_active('webp-uploads/webp-uploads.php') || 
+                         is_plugin_active('performance-lab/performance-lab.php') ||
+                         function_exists('webp_uploads_get_image_output_format');
+    
+    if ($use_modern_formats) {
+        // Get attachment metadata to check for modern format sources
+        $metadata = wp_get_attachment_metadata($thumb_id);
+        if (!empty($metadata) && isset($metadata['sizes'][$image_size]['sources'])) {
+            $upload_dir = wp_upload_dir();
+            $base_url = trailingslashit($upload_dir['baseurl']);
+            $file_dir = dirname($metadata['file']);
+            
+            // Get the preferred modern format
+            $preferred_format = 'webp';
+            if (function_exists('webp_uploads_get_image_output_format')) {
+                $preferred_format = webp_uploads_get_image_output_format();
+            }
+            
+            // Look for modern format in sources
+            $sources = $metadata['sizes'][$image_size]['sources'];
+            if (isset($sources['image/' . $preferred_format])) {
+                $modern_file = $sources['image/' . $preferred_format]['file'];
+                return $base_url . trailingslashit($file_dir) . $modern_file;
+            }
+            
+            // Fallback: look for any WebP source if preferred format not found
+            if ($preferred_format !== 'webp' && isset($sources['image/webp'])) {
+                $webp_file = $sources['image/webp']['file'];
+                return $base_url . trailingslashit($file_dir) . $webp_file;
+            }
+        }
+        
+        // Check if full-size image has modern format sources
+        if (!empty($metadata) && isset($metadata['sources'])) {
+            $upload_dir = wp_upload_dir();
+            $base_url = trailingslashit($upload_dir['baseurl']);
+            $file_dir = dirname($metadata['file']);
+            
+            $preferred_format = 'webp';
+            if (function_exists('webp_uploads_get_image_output_format')) {
+                $preferred_format = webp_uploads_get_image_output_format();
+            }
+            
+            // Look for modern format in full-size sources
+            $sources = $metadata['sources'];
+            if (isset($sources['image/' . $preferred_format])) {
+                $modern_file = $sources['image/' . $preferred_format]['file'];
+                return $base_url . trailingslashit($file_dir) . $modern_file;
+            }
+            
+            // Fallback: look for any WebP source if preferred format not found
+            if ($preferred_format !== 'webp' && isset($sources['image/webp'])) {
+                $webp_file = $sources['image/webp']['file'];
+                return $base_url . trailingslashit($file_dir) . $webp_file;
+            }
+        }
+    }
+    
+    // Fallback to standard method
+    return get_the_post_thumbnail_url($post_id, $image_size);
 }
 
 // Register custom image size (do not hook to after_setup_theme)
@@ -167,6 +237,10 @@ require_once plugin_dir_path(__FILE__) . 'settings.php';
  * @return array
  */
 function digsign_collect_media($options = []) {
+    // Performance timing instrumentation
+    $start_time = microtime(true);
+    $timings = [];
+    
     $defaults = [
         'category_name' => 'news',
         'image_size'    => 'digsign-gallery-thumb',
@@ -181,30 +255,54 @@ function digsign_collect_media($options = []) {
         'posts_per_page' => -1,
         'post_status'    => 'publish',
     ];
+    
+    $query_start = microtime(true);
     $query = new WP_Query($args);
+    $timings['database_query'] = (microtime(true) - $query_start) * 1000;
+    
     $results = [];
+    $processed_posts = 0;
+    $qr_generation_time = 0;
+    $image_processing_time = 0;
 
     if ($query->have_posts()) {
         while ($query->have_posts()) {
             $query->the_post();
             $post_id  = get_the_ID();
             $thumb_id = get_post_thumbnail_id($post_id);
+            
+            // Time QR code generation
+            $qr_start = microtime(true);
             $qr_code_url = ($opts['include_qr']) ? digsign_generate_qrcode($post_id) : '';
+            $qr_generation_time += (microtime(true) - $qr_start) * 1000;
 
             if ($thumb_id) {
-                // Ensure target size exists
+                $img_start = microtime(true);
+                
+                // PERFORMANCE FIX: Skip expensive synchronous image regeneration
+                // Instead, use existing image sizes or fallback gracefully
                 $meta = wp_get_attachment_metadata($thumb_id);
+                
+                // Log when image size is missing (for debugging)
                 if (!isset($meta['sizes'][$opts['image_size']])) {
-                    require_once ABSPATH . 'wp-admin/includes/image.php';
-                    $fullsizepath = get_attached_file($thumb_id);
-                    if ($fullsizepath && file_exists($fullsizepath)) {
-                        $metadata = wp_generate_attachment_metadata($thumb_id, $fullsizepath);
-                        if ($metadata && !is_wp_error($metadata)) {
-                            wp_update_attachment_metadata($thumb_id, $metadata);
+                    error_log("Digital Signage: Missing image size '{$opts['image_size']}' for attachment {$thumb_id}, using fallback");
+                }
+                
+                // Get image URL with modern format support (WebP if available)
+                // If the requested size doesn't exist, try fallback sizes
+                $img_url = digsign_get_modern_image_url($post_id, $opts['image_size']);
+                
+                // Fallback to other sizes if the requested size is not available
+                if (!$img_url && !isset($meta['sizes'][$opts['image_size']])) {
+                    $fallback_sizes = ['large', 'medium_large', 'medium', 'full'];
+                    foreach ($fallback_sizes as $fallback_size) {
+                        $img_url = digsign_get_modern_image_url($post_id, $fallback_size);
+                        if ($img_url) {
+                            error_log("Digital Signage: Used fallback size '{$fallback_size}' for post {$post_id}");
+                            break;
                         }
                     }
                 }
-                $img_url = get_the_post_thumbnail_url($post_id, $opts['image_size']);
                 if ($img_url) {
                     if ($opts['structure'] === 'urls') {
                         $results[] = $img_url; // simple list
@@ -230,10 +328,27 @@ function digsign_collect_media($options = []) {
                         'post_url' => get_permalink($post_id),
                     ];
                 }
+                
+                $image_processing_time += (microtime(true) - $img_start) * 1000;
             }
+            $processed_posts++;
         }
         wp_reset_postdata();
     }
+    
+    // Performance logging
+    $total_time = (microtime(true) - $start_time) * 1000;
+    $timings['total_execution'] = $total_time;
+    $timings['processed_posts'] = $processed_posts;
+    $timings['qr_generation'] = $qr_generation_time;
+    $timings['image_processing'] = $image_processing_time;
+    $timings['results_count'] = count($results);
+    
+    // Add debug info to results if WP_DEBUG is enabled
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        $results['_debug_timing'] = $timings;
+    }
+    
     return $results;
 }
 

@@ -3,7 +3,7 @@ Contributors: stankovski
 Tags: digital signage, slideshow, gallery
 Requires at least: 5.0
 Tested up to: 6.8
-Stable tag: 1.0.1
+Stable tag: 1.0.2
 Requires PHP: 7.0
 License: MIT
 License URI: https://opensource.org/licenses/MIT
@@ -44,6 +44,9 @@ Yes, you can set both the slide delay (time between slides) and page refresh int
 2. Admin settings page
 
 == Changelog ==
+
+= 1.0.2 =
+* Version bump
 
 = 1.0.1 =
 * Added support for HTML pages; misc. improvements
