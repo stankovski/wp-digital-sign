@@ -388,11 +388,11 @@ add_action('rest_api_init', function () {
     register_rest_route('dsp/v1', '/images', [
         'methods' => 'GET',
         'callback' => function () {
-            $category_name = get_option('dsp_category_name', 'news');
+            $category_name = get_option('digsign_category_name', 'news');
             // Legacy endpoint only returns image URLs (no HTML, no QR codes)
             $images = digsign_collect_media([
                 'category_name' => $category_name,
-                'image_size'    => 'dsp-gallery-thumb',
+                'image_size'    => 'digsign-gallery-thumb',
                 'include_html'  => false,
                 'include_qr'    => false,
                 'structure'     => 'urls'
