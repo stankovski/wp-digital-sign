@@ -9,6 +9,11 @@ function digsign_register_settings() {
         'default' => 'news',
         'sanitize_callback' => 'sanitize_text_field'
     ]);
+    register_setting('digsign_settings_group', 'digsign_friday_category_name', [
+        'type' => 'string',
+        'default' => '',
+        'sanitize_callback' => 'sanitize_text_field'
+    ]);
     register_setting('digsign_settings_group', 'digsign_image_width', [
         'type' => 'integer',
         'default' => 1260,
@@ -269,6 +274,7 @@ function digsign_render_settings_page() {
         'order' => 'ASC',
     ]);
     $selected_category = get_option('digsign_category_name', 'news');
+    $selected_friday_category = get_option('digsign_friday_category_name', '');
     $site_url = esc_url(home_url('/digital-signage/'));
     $has_plain_permalinks = digsign_has_plain_permalinks();
     
@@ -320,6 +326,20 @@ function digsign_render_settings_page() {
                             <?php endforeach; ?>
                         </select>
                         <p class="description">Posts from this category will be shown in the digital signage gallery.</p>
+                    </td>
+                </tr>
+                <tr valign="top">
+                    <th scope="row">Friday Announcements Category</th>
+                    <td>
+                        <select name="digsign_friday_category_name">
+                            <option value="" <?php selected($selected_friday_category, ''); ?>>Use the regular category</option>
+                            <?php foreach ($categories as $cat): ?>
+                                <option value="<?php echo esc_attr($cat->slug); ?>" <?php selected($selected_friday_category, $cat->slug); ?>>
+                                    <?php echo esc_html($cat->name); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <p class="description">When selected, posts from this category will be shown on Fridays according to the WordPress site timezone.</p>
                     </td>
                 </tr>
                 <tr valign="top">

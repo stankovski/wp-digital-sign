@@ -226,6 +226,24 @@ add_action('template_redirect', 'digsign_template_redirect');
 require_once plugin_dir_path(__FILE__) . 'settings.php';
 
 /**
+ * Get the category that should be displayed at the given site-local time.
+ *
+ * @param DateTimeInterface|null $site_datetime Site-local date and time. Defaults to the current WordPress time.
+ * @return string
+ */
+function digsign_get_active_category_name($site_datetime = null) {
+    $category_name = get_option('digsign_category_name', 'news');
+    $friday_category_name = get_option('digsign_friday_category_name', '');
+    $site_datetime = $site_datetime ?: current_datetime();
+
+    if (!empty($friday_category_name) && '5' === $site_datetime->format('N')) {
+        return $friday_category_name;
+    }
+
+    return $category_name;
+}
+
+/**
  * Collect media (slides or image URLs) for a given category.
  * Options (array):
  *  - category_name (string)
@@ -357,7 +375,7 @@ add_action('rest_api_init', function () {
     register_rest_route('digsign/v1', '/slides', [
         'methods' => 'GET',
         'callback' => function () {
-            $category_name     = get_option('digsign_category_name', 'news');
+            $category_name     = digsign_get_active_category_name();
             $refresh_interval  = intval(get_option('digsign_refresh_interval', 10));
             $slide_delay       = absint(get_option('digsign_slide_delay', 5));
             $enable_qrcodes    = (bool)get_option('digsign_enable_qrcodes', true);
@@ -388,7 +406,7 @@ add_action('rest_api_init', function () {
     register_rest_route('dsp/v1', '/images', [
         'methods' => 'GET',
         'callback' => function () {
-            $category_name = get_option('digsign_category_name', 'news');
+            $category_name = digsign_get_active_category_name();
             // Legacy endpoint only returns image URLs (no HTML, no QR codes)
             $images = digsign_collect_media([
                 'category_name' => $category_name,
@@ -407,7 +425,7 @@ add_action('rest_api_init', function () {
 function digsign_render_gallery_page() {
     $width = intval(get_option('digsign_image_width', 1260));
     $height = intval(get_option('digsign_image_height', 940));
-    $category_name = esc_html(get_option('digsign_category_name', 'news'));
+    $category_name = esc_html(digsign_get_active_category_name());
     $refresh_interval = intval(get_option('digsign_refresh_interval', 10));
     $slide_delay = absint(get_option('digsign_slide_delay', 5));
     $enable_qrcodes = (bool)get_option('digsign_enable_qrcodes', true);
