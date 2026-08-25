@@ -14,16 +14,6 @@ function digsign_register_settings() {
         'default' => '',
         'sanitize_callback' => 'sanitize_text_field'
     ]);
-    register_setting('digsign_settings_group', 'digsign_image_width', [
-        'type' => 'integer',
-        'default' => 1260,
-        'sanitize_callback' => 'absint'
-    ]);
-    register_setting('digsign_settings_group', 'digsign_image_height', [
-        'type' => 'integer',
-        'default' => 940,
-        'sanitize_callback' => 'absint'
-    ]);
     register_setting('digsign_settings_group', 'digsign_refresh_interval', [
         'type' => 'integer',
         'default' => 10,
@@ -97,40 +87,11 @@ function digsign_admin_scripts($hook) {
     wp_localize_script('digsign-admin-script', 'digsign_admin', array(
         'ajax_url' => admin_url('admin-ajax.php'),
         'nonce' => wp_create_nonce('digsign_cleanup_nonce'),
-        'confirm_message' => __('Are you sure you want to delete old image thumbnails? This cannot be undone.', 'digital-signage'),
-        'processing_message' => __('Processing...', 'digital-signage'),
     ));
     
     // Add inline script
     $script = "
         jQuery(document).ready(function($) {
-            // Thumbnails cleanup
-            $('#digsign-cleanup-button').on('click', function(e) {
-                e.preventDefault();
-                
-                if (!confirm(digsign_admin.confirm_message)) {
-                    return;
-                }
-                
-                const resultDiv = $('#digsign-cleanup-result');
-                resultDiv.html('<p>' + digsign_admin.processing_message + '</p>').show();
-                
-                $.ajax({
-                    url: digsign_admin.ajax_url,
-                    type: 'POST',
-                    data: {
-                        action: 'digsign_cleanup_thumbnails',
-                        nonce: digsign_admin.nonce
-                    },
-                    success: function(response) {
-                        resultDiv.html('<p>' + response.data + '</p>');
-                    },
-                    error: function() {
-                        resultDiv.html('<p class=\"error\">" . esc_js(__('An error occurred during the cleanup process.', 'digital-signage')) . "</p>');
-                    }
-                });
-            });
-            
             // Layout accordion toggle
             $('.digsign-layout-accordion-header').on('click', function() {
                 $(this).parent().toggleClass('digsign-layout-accordion-open');
@@ -168,101 +129,6 @@ function digsign_admin_scripts($hook) {
     ";
     
     wp_add_inline_script('digsign-admin-script', $script);
-}
-
-// AJAX handler for thumbnail cleanup
-function digsign_cleanup_thumbnails_handler() {
-    if (!isset($_POST['nonce']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['nonce'])), 'digsign_cleanup_nonce')) {
-        wp_send_json_error(__('Security check failed.', 'digital-signage'));
-    }
-    
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error(__('You do not have permission to perform this action.', 'digital-signage'));
-    }
-    
-    $result = digsign_cleanup_gallery_thumbnails();
-    
-    if (is_wp_error($result)) {
-        wp_send_json_error($result->get_error_message());
-    } else {
-        /* translators: %d: number of deleted files */
-        $message = sprintf(__('Cleanup complete. %d old gallery thumbnails were deleted.', 'digital-signage'), $result);
-        wp_send_json_success($message);
-    }
-}
-
-/**
- * Cleanup old gallery thumbnails
- * 
- * @return int|WP_Error Number of deleted files or WP_Error
- */
-function digsign_cleanup_gallery_thumbnails() {
-    global $wpdb;
-    
-    try {
-        // Get all attachment IDs with digsign-gallery-thumb in their metadata
-        $attachments = [];
-        $query = new WP_Query([
-            'post_type' => 'attachment',
-            'post_status' => 'inherit',
-            'posts_per_page' => -1,
-            'meta_query' => [
-                [
-                    'key' => '_wp_attachment_metadata',
-                    'value' => 'digsign-gallery-thumb',
-                    'compare' => 'LIKE'
-                ]
-            ],
-            'fields' => 'ids'
-        ]);
-        
-        if ($query->have_posts()) {
-            foreach ($query->posts as $post_id) {
-                $meta_value = get_post_meta($post_id, '_wp_attachment_metadata', true);
-                if ($meta_value) {
-                    $attachments[] = (object)[
-                        'post_id' => $post_id,
-                        'meta_value' => $meta_value
-                    ];
-                }
-            }
-        }
-        
-        if (empty($attachments)) {
-            return 0;
-        }
-        
-        $deleted_count = 0;
-        $upload_dir = wp_upload_dir();
-        $base_dir = $upload_dir['basedir'];
-        
-        foreach ($attachments as $attachment) {
-            $meta = maybe_unserialize($attachment->meta_value);
-            
-            if (!isset($meta['sizes']['digsign-gallery-thumb']) || !isset($meta['file'])) {
-                continue;
-            }
-            
-            // Get path to the thumbnail
-            $file_dir = dirname($meta['file']);
-            $thumb_file = $meta['sizes']['digsign-gallery-thumb']['file'];
-            $thumb_path = $base_dir . '/' . $file_dir . '/' . $thumb_file;
-            
-            // Delete the file if it exists
-            if (file_exists($thumb_path) && wp_delete_file($thumb_path)) {
-                $deleted_count++;
-            }
-            
-            // Remove from metadata
-            unset($meta['sizes']['digsign-gallery-thumb']);
-            update_post_meta($attachment->post_id, '_wp_attachment_metadata', $meta);
-        }
-        
-        return $deleted_count;
-        
-    } catch (Exception $e) {
-        return new WP_Error('cleanup_failed', $e->getMessage());
-    }
 }
 
 // Render settings page
@@ -340,20 +206,6 @@ function digsign_render_settings_page() {
                             <?php endforeach; ?>
                         </select>
                         <p class="description">When selected, posts from this category will be shown on Fridays according to the WordPress site timezone.</p>
-                    </td>
-                </tr>
-                <tr valign="top">
-                    <th scope="row">Image Width</th>
-                    <td>
-                        <input type="number" name="digsign_image_width" value="<?php echo esc_attr(get_option('digsign_image_width', 1260)); ?>" min="1" />
-                        <p class="description">Width in pixels for signage images.</p>
-                    </td>
-                </tr>
-                <tr valign="top">
-                    <th scope="row">Image Height</th>
-                    <td>
-                        <input type="number" name="digsign_image_height" value="<?php echo esc_attr(get_option('digsign_image_height', 940)); ?>" min="1" />
-                        <p class="description">Height in pixels for signage images.</p>
                     </td>
                 </tr>
                 <tr valign="top">
@@ -468,14 +320,6 @@ function digsign_render_settings_page() {
             <?php submit_button(); ?>
         </form>
         
-        <hr>
-        
-        <h2><?php esc_html_e('Image Management', 'digital-signage'); ?></h2>
-        <p><?php esc_html_e('If you\'ve changed image dimensions, you may want to clean up old thumbnails to save disk space.', 'digital-signage'); ?></p>
-        <button id="digsign-cleanup-button" class="button button-secondary">
-            <?php esc_html_e('Delete Old Thumbnails', 'digital-signage'); ?>
-        </button>
-        <div id="digsign-cleanup-result" style="margin-top: 10px; display: none;"></div>
     </div>
     <?php
 }
@@ -484,4 +328,3 @@ function digsign_render_settings_page() {
 add_action('admin_init', 'digsign_register_settings');
 add_action('admin_menu', 'digsign_add_settings_page');
 add_action('admin_enqueue_scripts', 'digsign_admin_scripts');
-add_action('wp_ajax_digsign_cleanup_thumbnails', 'digsign_cleanup_thumbnails_handler');

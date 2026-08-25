@@ -7,8 +7,6 @@ if (!defined('WP_UNINSTALL_PLUGIN')) {
 // Delete all options created by the plugin
 delete_option('digsign_category_name');
 delete_option('digsign_friday_category_name');
-delete_option('digsign_image_width');
-delete_option('digsign_image_height');
 delete_option('digsign_refresh_interval');
 delete_option('digsign_slide_delay');
 

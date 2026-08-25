@@ -74,97 +74,6 @@ function digsign_generate_qrcode($post_id) {
     return $file_url;
 }
 
-// Get image URL with modern format support (WebP, AVIF, etc.)
-function digsign_get_modern_image_url($post_id, $image_size) {
-    $thumb_id = get_post_thumbnail_id($post_id);
-    if (!$thumb_id) {
-        return false;
-    }
-    
-    // Check if webp-uploads plugin is active and modern formats should be used
-    $use_modern_formats = is_plugin_active('webp-uploads/webp-uploads.php') || 
-                         is_plugin_active('performance-lab/performance-lab.php') ||
-                         function_exists('webp_uploads_get_image_output_format');
-    
-    if ($use_modern_formats) {
-        // Get attachment metadata to check for modern format sources
-        $metadata = wp_get_attachment_metadata($thumb_id);
-        if (!empty($metadata) && isset($metadata['sizes'][$image_size]['sources'])) {
-            $upload_dir = wp_upload_dir();
-            $base_url = trailingslashit($upload_dir['baseurl']);
-            $file_dir = dirname($metadata['file']);
-            
-            // Get the preferred modern format
-            $preferred_format = 'webp';
-            if (function_exists('webp_uploads_get_image_output_format')) {
-                $preferred_format = webp_uploads_get_image_output_format();
-            }
-            
-            // Look for modern format in sources
-            $sources = $metadata['sizes'][$image_size]['sources'];
-            if (isset($sources['image/' . $preferred_format])) {
-                $modern_file = $sources['image/' . $preferred_format]['file'];
-                return $base_url . trailingslashit($file_dir) . $modern_file;
-            }
-            
-            // Fallback: look for any WebP source if preferred format not found
-            if ($preferred_format !== 'webp' && isset($sources['image/webp'])) {
-                $webp_file = $sources['image/webp']['file'];
-                return $base_url . trailingslashit($file_dir) . $webp_file;
-            }
-        }
-        
-        // Check if full-size image has modern format sources
-        if (!empty($metadata) && isset($metadata['sources'])) {
-            $upload_dir = wp_upload_dir();
-            $base_url = trailingslashit($upload_dir['baseurl']);
-            $file_dir = dirname($metadata['file']);
-            
-            $preferred_format = 'webp';
-            if (function_exists('webp_uploads_get_image_output_format')) {
-                $preferred_format = webp_uploads_get_image_output_format();
-            }
-            
-            // Look for modern format in full-size sources
-            $sources = $metadata['sources'];
-            if (isset($sources['image/' . $preferred_format])) {
-                $modern_file = $sources['image/' . $preferred_format]['file'];
-                return $base_url . trailingslashit($file_dir) . $modern_file;
-            }
-            
-            // Fallback: look for any WebP source if preferred format not found
-            if ($preferred_format !== 'webp' && isset($sources['image/webp'])) {
-                $webp_file = $sources['image/webp']['file'];
-                return $base_url . trailingslashit($file_dir) . $webp_file;
-            }
-        }
-    }
-    
-    // Fallback to standard method
-    return get_the_post_thumbnail_url($post_id, $image_size);
-}
-
-// Register custom image size (do not hook to after_setup_theme)
-function digsign_register_image_sizes() {
-    $width = intval(get_option('digsign_image_width', 1260));
-    $height = intval(get_option('digsign_image_height', 940));
-    
-    // Remove previously registered size if it exists
-    if (has_image_size('digsign-gallery-thumb')) {
-        remove_image_size('digsign-gallery-thumb');
-    }
-    
-    // Register with current settings values
-    add_image_size('digsign-gallery-thumb', $width, $height, false);
-}
-
-// Call directly during plugin initialization
-digsign_register_image_sizes(); 
-
-// Hook to option updates to regenerate image sizes when settings change
-add_action('update_option_digsign_image_width', 'digsign_register_image_sizes');
-add_action('update_option_digsign_image_height', 'digsign_register_image_sizes');
-
 // Register custom rewrite endpoint
 function digsign_add_gallery_rewrite() {
     add_rewrite_rule('^digital-signage/?$', 'index.php?digsign_gallery=1', 'top');
@@ -247,7 +156,6 @@ function digsign_get_active_category_name($site_datetime = null) {
  * Collect media (slides or image URLs) for a given category.
  * Options (array):
  *  - category_name (string)
- *  - image_size (string) image size name to request
  *  - include_html (bool) whether to fallback to post HTML content when no featured image
  *  - include_qr (bool) whether to generate QR codes for posts
  *  - structure (string) 'slides' for detailed slide objects or 'urls' for simple list of image URLs
@@ -261,7 +169,6 @@ function digsign_collect_media($options = []) {
     
     $defaults = [
         'category_name' => 'news',
-        'image_size'    => 'digsign-gallery-thumb',
         'include_html'  => true,
         'include_qr'    => true,
         'structure'     => 'slides', // 'slides' or 'urls'
@@ -296,31 +203,7 @@ function digsign_collect_media($options = []) {
 
             if ($thumb_id) {
                 $img_start = microtime(true);
-                
-                // PERFORMANCE FIX: Skip expensive synchronous image regeneration
-                // Instead, use existing image sizes or fallback gracefully
-                $meta = wp_get_attachment_metadata($thumb_id);
-                
-                // Log when image size is missing (for debugging)
-                if (!isset($meta['sizes'][$opts['image_size']])) {
-                    error_log("Digital Signage: Missing image size '{$opts['image_size']}' for attachment {$thumb_id}, using fallback");
-                }
-                
-                // Get image URL with modern format support (WebP if available)
-                // If the requested size doesn't exist, try fallback sizes
-                $img_url = digsign_get_modern_image_url($post_id, $opts['image_size']);
-                
-                // Fallback to other sizes if the requested size is not available
-                if (!$img_url && !isset($meta['sizes'][$opts['image_size']])) {
-                    $fallback_sizes = ['large', 'medium_large', 'medium', 'full'];
-                    foreach ($fallback_sizes as $fallback_size) {
-                        $img_url = digsign_get_modern_image_url($post_id, $fallback_size);
-                        if ($img_url) {
-                            error_log("Digital Signage: Used fallback size '{$fallback_size}' for post {$post_id}");
-                            break;
-                        }
-                    }
-                }
+                $img_url = wp_get_attachment_url($thumb_id);
                 if ($img_url) {
                     if ($opts['structure'] === 'urls') {
                         $results[] = $img_url; // simple list
@@ -382,7 +265,6 @@ add_action('rest_api_init', function () {
             $layout_type       = get_option('digsign_layout_type', 'fullscreen');
             $slides = digsign_collect_media([
                 'category_name' => $category_name,
-                'image_size'    => 'digsign-gallery-thumb',
                 'include_html'  => true,
                 'include_qr'    => $enable_qrcodes,
                 'structure'     => 'slides'
@@ -410,7 +292,6 @@ add_action('rest_api_init', function () {
             // Legacy endpoint only returns image URLs (no HTML, no QR codes)
             $images = digsign_collect_media([
                 'category_name' => $category_name,
-                'image_size'    => 'digsign-gallery-thumb',
                 'include_html'  => false,
                 'include_qr'    => false,
                 'structure'     => 'urls'
@@ -423,8 +304,6 @@ add_action('rest_api_init', function () {
 
 // Render gallery HTML
 function digsign_render_gallery_page() {
-    $width = intval(get_option('digsign_image_width', 1260));
-    $height = intval(get_option('digsign_image_height', 940));
     $category_name = esc_html(digsign_get_active_category_name());
     $refresh_interval = intval(get_option('digsign_refresh_interval', 10));
     $slide_delay = absint(get_option('digsign_slide_delay', 5));
@@ -443,21 +322,6 @@ function digsign_render_gallery_page() {
     // Enqueue required styles and scripts
     wp_enqueue_style('digsign-gallery-style');
     wp_enqueue_script('digsign-gallery-script');
-    
-    // Add inline style for dynamic values
-    wp_add_inline_style('digsign-gallery-style', sprintf('
-        .gallery .slide {
-            width: %dpx;
-            height: %dpx;
-        }
-        .gallery .html-content {
-            max-height: %dpx;
-        }
-        .digsign-layout-main {
-            width: %dpx;
-            max-width: %dpx;
-        }
-    ', $width, $height, $height - 40, $width, $width));
     
     // Add inline script for dynamic values
     wp_add_inline_script('digsign-gallery-script', sprintf('
